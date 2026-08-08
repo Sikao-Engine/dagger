@@ -1,6 +1,5 @@
 /**
  * SSE event parser for opencode-compatible streaming.
- * Ported from cube-claw dashboard `lib/sse/parser.ts` — protocol normalization
  * is shared between the agentcli backend and loom_agent's opencode-http.
  *
  * Loom's LoomEvent (run/node lifecycle) arrives via the run-level stream as a

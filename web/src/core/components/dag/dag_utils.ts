@@ -1,5 +1,5 @@
 /**
- * DAG canvas helpers — ported from cube-claw dashboard `dag/dag_utils.ts`,
+ * DAG canvas helpers
  * with the hardcoded `NODE_TYPE_ICON` table removed (node_type is a free-form
  * string registered by domain plugins; we render it as text, not a fixed emoji).
  *
