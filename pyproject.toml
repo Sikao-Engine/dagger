@@ -1,0 +1,117 @@
+[workspace]
+members = [
+    "packages/loom_kernel",
+    "packages/loom_agent",
+    "packages/loom_cli",
+    "domains/tiny",
+    "domains/novel_digest",
+    "server",
+]
+exclude = ["web"]
+
+[workspace.package]
+version = "0.1.0"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.uv.workspace]
+members = [
+    "packages/loom_kernel",
+    "packages/loom_agent",
+    "packages/loom_cli",
+    "domains/tiny",
+    "domains/novel_digest",
+    "server",
+]
+
+[tool.uv.sources]
+loom_kernel = { workspace = true }
+loom_agent = { workspace = true }
+loom_cli = { workspace = true }
+loom_server = { workspace = true }
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.6.0",
+    "mypy>=1.11",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "import-linter>=2.0",
+    "pre-commit>=3.8",
+    "coverage>=7.5",
+    "types-jsonschema>=4.0",
+    "ruyaml>=0.91",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["web", "node_modules", "doc"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RET", "PL", "RUF"]
+ignore = ["PLR0912", "PLR0913", "PLR2004", "PLW0603", "RUF001", "RUF002", "RUF003", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["PLR2004", "S101", "PLR0913", "PLC0415"]
+"domains/**/tests/**" = ["PLR2004", "S101"]
+"scripts/**" = ["PLC0415"]
+"packages/loom_cli/**" = ["PLC0415", "PLR0915", "PLR0917"]
+# Vendored opencode client/process_manager/sse_parser: faithful port of CubeClaw's
+# long-validated code; dispatch-by-type has many returns, Popen needs raw file
+# handles, and httpx is imported lazily (optional dep path).
+"packages/loom_agent/src/loom_agent/opencode/**" = ["PLR0911", "SIM115", "PLC0415"]
+"packages/loom_agent/src/loom_agent/backends/opencode_http.py" = ["PLR0911"]
+# State module: lazy imports avoid optional deps (jsonschema) + circular imports
+# (SchemaError is raised only on the failure path); layout/key use dispatch-by-key
+# with one return per branch (pinned by snapshot tests); RetryPolicy/Layer/Scope
+# stay str+Enum for backwards-compatible .value access on 3.12.
+"packages/loom_kernel/src/loom_kernel/state/**" = ["PLC0415", "PLR0911", "PLR0915", "PLR0917", "SIM103", "SIM105", "UP042", "E741"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["packages/loom_kernel/src"]
+exclude = ["domains/", "server/", "web/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "domains", "server"]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers --import-mode=importlib"
+pythonpath = [
+    "packages/loom_kernel",
+    "packages/loom_agent",
+    "packages/loom_cli",
+    "domains/tiny",
+    "domains/novel_digest",
+    "server/src",
+]
+markers = ["e2e: end-to-end tests"]
+
+[tool.coverage.run]
+source = ["loom_kernel", "loom_agent", "loom_cli", "loom_server"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "raise NotImplementedError", "if TYPE_CHECKING:"]
+
+[tool.importlinter]
+root_packages = ["loom_kernel", "loom_server"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Kernel must not import outer packages"
+type = "forbidden"
+source_modules = ["loom_kernel"]
+forbidden_modules = ["loom_agent", "server", "domains", "tiny", "novel_digest"]
+
+[[tool.importlinter.contracts]]
+name = "Server must not import concrete domain modules"
+type = "forbidden"
+source_modules = ["loom_server"]
+forbidden_modules = ["tiny", "novel_digest", "domains"]

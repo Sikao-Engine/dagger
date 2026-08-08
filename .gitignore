@@ -1,0 +1,53 @@
+.kimix_cache
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# uv
+uv.lock
+
+# Node / pnpm
+node_modules/
+pnpm-debug.log*
+.npm/
+web/dist/
+web/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Loom runtime
+.loom/
+*.loomarc
+/state/
+/workspaces/
+
+# Loom DB (default SQLite; tests/migrations produce these)
+loom.db
+loom.db-*
+*.sqlite
+*.sqlite-*
+
+# Runtime logs
+*.log
