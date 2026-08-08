@@ -227,20 +227,10 @@ def _resolve_edge(
     template: DagTemplate,
     shards: tuple[ShardPlan, ...],
 ) -> None:
-    src_scope = template.node(edge.source).scope
     tgt_scope = template.node(edge.target).scope
 
     if edge.kind is EdgeKind.INTRA:
-        # Same shard: src[s] -> tgt[s] for every shard.
-        if src_scope is not Scope.SHARD or tgt_scope is not Scope.SHARD:
-            raise InstantiateError(
-                f"INTRA edge {edge.source}->{edge.target} requires both nodes SHARD-scoped"
-            )
-        for sh in shards:
-            s_id = _node_run_id(edge.source, sh.index, graph.run_id)
-            t_id = _node_run_id(edge.target, sh.index, graph.run_id)
-            if s_id in graph.nodes and t_id in graph.nodes:
-                graph.nodes[t_id].dependencies.add(s_id)
+        _resolve_intra_edge(graph, edge, template, shards)
 
     elif edge.kind is EdgeKind.RUN_ENTRY:
         # run_entry src -> single shard tgt (paired by index). Not commonly used
@@ -306,6 +296,50 @@ def _resolve_edge(
 
     else:  # pragma: no cover - exhaustive enum
         raise InstantiateError(f"unknown edge kind: {edge.kind!r}")
+
+
+def _resolve_intra_edge(
+    graph: NodeRunGraph,
+    edge: EdgeDef,
+    template: DagTemplate,
+    shards: tuple[ShardPlan, ...],
+) -> None:
+    """Resolve an INTRA edge into dependencies.
+
+    INTRA carries one semantic — "sequential within one scope" — at two levels:
+      shard level: src[s] -> tgt[s] for every shard (both SHARD-scoped);
+      run level:   the single src instance -> the single tgt instance
+                   (both RUN/RUN_ENTRY-scoped).
+    Mixing levels (SHARD <-> RUN) is a topology error; use ALL/LAST/RUN_ENTRY_*.
+    """
+    src_scope = template.node(edge.source).scope
+    tgt_scope = template.node(edge.target).scope
+    run_scopes = (Scope.RUN, Scope.RUN_ENTRY)
+    pairs: list[tuple[str, str]] = []
+    if src_scope in run_scopes and tgt_scope in run_scopes:
+        pairs.append(
+            (
+                _node_run_id(edge.source, None, graph.run_id),
+                _node_run_id(edge.target, None, graph.run_id),
+            )
+        )
+    elif src_scope is Scope.SHARD and tgt_scope is Scope.SHARD:
+        pairs.extend(
+            (
+                _node_run_id(edge.source, sh.index, graph.run_id),
+                _node_run_id(edge.target, sh.index, graph.run_id),
+            )
+            for sh in shards
+        )
+    else:
+        raise InstantiateError(
+            f"INTRA edge {edge.source}->{edge.target} requires both nodes in the "
+            f"same scope level (both SHARD, or both RUN/RUN_ENTRY); got "
+            f"{src_scope.value}->{tgt_scope.value}"
+        )
+    for s_id, t_id in pairs:
+        if s_id in graph.nodes and t_id in graph.nodes:
+            graph.nodes[t_id].dependencies.add(s_id)
 
 
 def expand_dynamic(

@@ -4,10 +4,13 @@ version = "0.1.0"
 description = "Novel digest domain for Loom: chapter summary + timeline + consistency"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["loom_kernel"]
+dependencies = ["loom_kernel", "loom_cli", "jinja2>=3.1"]
 
 [project.entry-points."loom.domains"]
 novel_digest = "novel_digest.plugin:plugin"
+
+[project.scripts]
+noveltool = "novel_digest.noveltool.cli:main"
 
 [build-system]
 requires = ["hatchling"]

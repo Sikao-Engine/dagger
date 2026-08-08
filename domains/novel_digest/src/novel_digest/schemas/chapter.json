@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "novel_chapter",
+  "type": "object",
+  "required": ["chapter_id", "summary", "entities", "timeline_delta", "digest_ok"],
+  "properties": {
+    "chapter_id": {"type": "string"},
+    "summary": {"type": "string"},
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "aliases", "first_seen_chapter"],
+        "properties": {
+          "name": {"type": "string"},
+          "type": {
+            "type": "string",
+            "enum": ["person", "place", "item", "faction", "concept"]
+          },
+          "aliases": {"type": "array", "items": {"type": "string"}},
+          "first_seen_chapter": {"type": "string"}
+        }
+      }
+    },
+    "timeline_delta": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event", "chapter", "participants", "anchors"],
+        "properties": {
+          "event": {"type": "string"},
+          "chapter": {"type": "integer"},
+          "participants": {"type": "array", "items": {"type": "string"}},
+          "anchors": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "digest_ok": {"type": "boolean"}
+  }
+}

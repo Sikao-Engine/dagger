@@ -306,3 +306,359 @@ class TestEngineHooks:
         assert starts  # at least one node started
         assert succs  # at least one succeeded
         assert not fails
+
+
+# ---------------------------------------------------------------------------
+# K3 / K4 / K8 / D8 additions: agent result-contract enforcement, shard view
+# enrichment, edge-aware context propagation, and the parallel-writes rule.
+# ---------------------------------------------------------------------------
+
+from loom_kernel.dag.instantiator import ShardPlan  # noqa: E402
+from loom_kernel.spi import SkillSpec  # noqa: E402
+
+
+def _shards(n: int, items_per_shard: int = 1) -> list[ShardPlan]:
+    return [
+        ShardPlan(
+            shard_id=f"s{i}",
+            index=i,
+            items=tuple(f"item-{i}-{j}" for j in range(items_per_shard)),
+        )
+        for i in range(n)
+    ]
+
+
+class TestAgentResultContract:
+    """K3: with skills wired in, agent outputs are checked against produces."""
+
+    def test_agent_writing_undeclared_key_fails(
+        self, catalog, nodes, store, tmp_path: Path
+    ) -> None:
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(1))
+        dispatcher = _ScriptedDispatcher({"work": {"work_ok": True, "rogue_key": 1}})
+        skills = {
+            "tiny-work": SkillSpec(
+                key="tiny-work",
+                skill_name="tiny-work",
+                prompt_template="...",
+                success_key="work_ok",
+                produces=("work_ok",),
+            )
+        }
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=dispatcher,
+            max_node_retries=2,
+            skills=skills,
+        )
+        assert "run_e2e__work__s000" in result.failed
+        # The rogue write was retried (2 attempts), not accepted silently.
+        assert dispatcher.calls.count("run_e2e__work__s000") == 2
+
+    def test_success_key_is_allowed_even_when_not_in_produces(
+        self, catalog, nodes, store, tmp_path: Path
+    ) -> None:
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(1))
+        dispatcher = _ScriptedDispatcher({"work": {"work_ok": True}})
+        skills = {
+            "tiny-work": SkillSpec(
+                key="tiny-work",
+                skill_name="tiny-work",
+                prompt_template="...",
+                success_key="work_ok",
+                produces=(),  # success_key alone must pass
+            )
+        }
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=dispatcher,
+            skills=skills,
+        )
+        assert "run_e2e__work__s000" in result.completed
+
+    def test_legacy_behavior_without_skills(self, catalog, nodes, store, tmp_path: Path) -> None:
+        """Hosts that pass no skills get the old (unenforced) behavior."""
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(1))
+        # An extra undeclared key passes unchecked when no skills map is wired.
+        dispatcher = _ScriptedDispatcher({"work": {"work_ok": True, "anything": 1}})
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=dispatcher,
+        )
+        assert "run_e2e__work__s000" in result.completed
+
+
+class TestResultValidators:
+    """K3: the domain ResultValidator SPI runs against the full result body."""
+
+    def test_validator_errors_fail_the_node_and_retry(
+        self, catalog, nodes, store, tmp_path: Path
+    ) -> None:
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(1))
+        dispatcher = _ScriptedDispatcher({"work": {"work_ok": True, "chapters_done": 1}})
+        calls = {"n": 0}
+
+        def _reject(body, *, node_run_id, context=None):
+            calls["n"] += 1
+            return ["chapters_done off by one"]
+
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=dispatcher,
+            max_node_retries=2,
+            validators={"tiny.work": _reject},
+        )
+        assert "run_e2e__work__s000" in result.failed
+        assert calls["n"] == 2  # once per attempt
+
+    def test_validator_receives_shard_context(self, catalog, nodes, store, tmp_path: Path) -> None:
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(1, items_per_shard=3))
+        dispatcher = _ScriptedDispatcher({"work": {"work_ok": True, "chapters_done": 3}})
+        seen_contexts: list[dict] = []
+
+        def _check_count(body, *, node_run_id, context=None):
+            seen_contexts.append(dict(context or {}))
+            expected = (context or {}).get("shard", {}).get("item_count")
+            if body["outputs"].get("chapters_done") != expected:
+                return [f"chapters_done != shard.item_count ({expected})"]
+            return []
+
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=dispatcher,
+            validators={"tiny.work": _check_count},
+        )
+        assert "run_e2e__work__s000" in result.completed
+        assert seen_contexts and seen_contexts[0]["shard"]["item_count"] == 3
+
+
+class TestShardViewEnrichment:
+    """K4: agent nodes see shard.item_count / first_item / last_item in ctx."""
+
+    def test_shard_view_has_item_info(self, catalog, nodes, store, tmp_path: Path) -> None:
+        tpl = _tiny_template()
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=_shards(2, items_per_shard=3))
+        seen: dict[str, dict] = {}
+
+        class _CtxProbe:
+            def __call__(self, *, node_run, ctx, executor, store, attempt):
+                seen[node_run.node_run_id] = dict(ctx.shard)
+                return {"work_ok": True}
+
+        run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=catalog,
+            node_registry=nodes,
+            agent_dispatcher=_CtxProbe(),
+        )
+        view = seen["run_e2e__work__s001"]
+        assert view["shard_id"] == "s1"
+        assert view["index"] == 1
+        assert view["item_count"] == 3
+        assert view["items"] == ["item-1-0", "item-1-1", "item-1-2"]
+        assert view["first_item"] == {"id": "item-1-0"}
+        assert view["last_item"] == {"id": "item-1-2"}
+
+
+class TestEdgeAwarePropagation:
+    """K8: context flows along edges with per-kind targeting (no broadcast leaks)."""
+
+    def _two_step_template(self) -> DagTemplate:
+        return DagTemplate(
+            id="pipe",
+            domain_id="d",
+            nodes=(
+                NodeDef("produce", "tiny.work", Scope.SHARD, priority=10),
+                NodeDef("consume", "tiny.consume", Scope.SHARD, priority=20),
+                NodeDef("report", "tiny.report", Scope.RUN, priority=50),
+            ),
+            edges=(
+                EdgeDef("produce", "consume", EdgeKind.INTRA),
+                EdgeDef("consume", "report", EdgeKind.ALL),
+            ),
+        )
+
+    def _catalog_with_consume(self) -> ExecutorCatalog:
+        cat = _make_catalog()
+        cat.register(
+            ExecutorSpec(key="tiny.consume", label="consume", handler_kind="agent", scope="shard")
+        )
+        return cat
+
+    def _nodes_with_consume_report(self) -> NodeRegistry:
+        class _ConsumeReport:
+            contract = NodeContract(reads=("consumed_ok",), writes=("report_ok",))
+
+            def run(self, ctx) -> ContextPatch:
+                return ContextPatch(values={"report_ok": True})
+
+        reg = NodeRegistry()
+        reg.register("tiny.report", _ConsumeReport())
+        return reg
+
+    def test_intra_delivers_same_shard_only(self, store, tmp_path: Path) -> None:
+        """Distinct per-shard values must not collide in sibling contexts."""
+        tpl = self._two_step_template()
+        cat = self._catalog_with_consume()
+        nodes = self._nodes_with_consume_report()
+        shards = [
+            ShardPlan(shard_id="s0", index=0, items=("a", "b", "c")),
+            ShardPlan(shard_id="s1", index=1, items=("d", "e")),
+        ]
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=shards)
+        seen: dict[str, dict] = {}
+
+        class _Dispatcher:
+            def __call__(self, *, node_run, ctx, executor, store, attempt):
+                if node_run.node_key == "produce":
+                    # Per-shard-distinct value: would false-conflict under broadcast.
+                    return {"count": len(ctx.shard["items"])}
+                seen[node_run.node_run_id] = ctx.values()
+                return {"consumed_ok": True}
+
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=cat,
+            node_registry=nodes,
+            agent_dispatcher=_Dispatcher(),
+        )
+        assert not result.failed
+        # consume[s0] saw only produce[s0]'s count; consume[s1] only produce[s1]'s.
+        assert seen["run_e2e__consume__s000"]["count"] == 3
+        assert seen["run_e2e__consume__s001"]["count"] == 2
+
+    def test_serial_prev_delivers_next_shard_only(self, store, tmp_path: Path) -> None:
+        tpl = DagTemplate(
+            id="serial",
+            domain_id="d",
+            nodes=(NodeDef("acc", "tiny.acc", Scope.SHARD, priority=10),),
+            edges=(EdgeDef("acc", "acc", EdgeKind.SERIAL_PREV, maps={"prev_total": "total"}),),
+        )
+        cat = ExecutorCatalog()
+        cat.register(ExecutorSpec(key="tiny.acc", label="acc", handler_kind="agent", scope="shard"))
+        shards = [ShardPlan(shard_id=f"s{i}", index=i, items=(f"i{i}",)) for i in range(3)]
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=shards)
+        seen: dict[str, dict] = {}
+
+        class _Acc:
+            def __call__(self, *, node_run, ctx, executor, store, attempt):
+                seen[node_run.node_run_id] = ctx.values()
+                prev = ctx.get("prev_total", 0)
+                return {"total": prev + 1}
+
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=cat,
+            node_registry=NodeRegistry(),
+            agent_dispatcher=_Acc(),
+        )
+        assert not result.failed
+        # The serial chain accumulated: 1, 2, 3 — each shard saw only its predecessor.
+        assert seen["run_e2e__acc__s000"].get("prev_total") is None
+        assert seen["run_e2e__acc__s001"]["prev_total"] == 1
+        assert seen["run_e2e__acc__s002"]["prev_total"] == 2
+
+
+class TestParallelWritesRule:
+    """D8: ALL fan-in merges equal values; differing values raise a conflict."""
+
+    def test_all_fanin_equal_values_merge(self, nodes, store, tmp_path: Path) -> None:
+        tpl = self._all_fanin_template()
+        cat = self._all_fanin_catalog()
+        shards = [ShardPlan(shard_id=f"s{i}", index=i, items=(f"i{i}",)) for i in range(3)]
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=shards)
+        seen: dict[str, dict] = {}
+
+        class _Bool:
+            def __call__(self, *, node_run, ctx, executor, store, attempt):
+                seen[node_run.node_run_id] = ctx.values()
+                return {"merge_ok": True} if node_run.node_key == "merge" else {"flag_ok": True}
+
+        result = run_graph(
+            graph=graph,
+            template=tpl,
+            store=store,
+            catalog=cat,
+            node_registry=nodes,
+            agent_dispatcher=_Bool(),
+        )
+        assert not result.failed
+        assert seen["run_e2e__merge"]["flag_ok"] is True
+
+    def test_all_fanin_differing_values_raise_conflict(self, nodes, store, tmp_path: Path) -> None:
+        from loom_kernel.dag import ContextConflictError
+
+        tpl = self._all_fanin_template()
+        cat = self._all_fanin_catalog()
+        shards = [ShardPlan(shard_id=f"s{i}", index=i, items=(f"i{i}",)) for i in range(2)]
+        graph = instantiate(template=tpl, run_id="run_e2e", shards=shards)
+
+        class _Distinct:
+            def __call__(self, *, node_run, ctx, executor, store, attempt):
+                if node_run.node_key == "flag":
+                    return {"flag_ok": node_run.shard_index}  # distinct per shard
+                return {"merge_ok": True}
+
+        import pytest
+
+        with pytest.raises(ContextConflictError):
+            run_graph(
+                graph=graph,
+                template=tpl,
+                store=store,
+                catalog=cat,
+                node_registry=nodes,
+                agent_dispatcher=_Distinct(),
+            )
+
+    def _all_fanin_template(self) -> DagTemplate:
+        return DagTemplate(
+            id="fanin",
+            domain_id="d",
+            nodes=(
+                NodeDef("flag", "tiny.flag", Scope.SHARD, priority=10),
+                NodeDef("merge", "tiny.merge", Scope.RUN, priority=50),
+            ),
+            edges=(EdgeDef("flag", "merge", EdgeKind.ALL),),
+        )
+
+    def _all_fanin_catalog(self) -> ExecutorCatalog:
+        cat = ExecutorCatalog()
+        cat.register(
+            ExecutorSpec(key="tiny.flag", label="flag", handler_kind="agent", scope="shard")
+        )
+        cat.register(
+            ExecutorSpec(key="tiny.merge", label="merge", handler_kind="agent", scope="run")
+        )
+        return cat

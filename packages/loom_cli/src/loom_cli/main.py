@@ -1,11 +1,18 @@
 """loom CLI: run, state, config, domains.
 
-`loom run --domain tiny --items ./data --shards 3` runs the tiny domain
-end-to-end with the mock backend (or a configured real backend).
+`loom run --domain <id> --items ./data --shards 3` runs a domain's default
+template end-to-end with the mock backend (or a configured real backend).
+
+Domain discovery: entry points (`loom.domains` group) first; as a dev fallback,
+each `<repo>/domains/*/src/<pkg>/plugin.py` is imported best-effort (directory
+name = package name convention). The mock dispatcher is domain-agnostic: a
+plugin's optional `mock_outputs` hook supplies domain-shaped outputs, otherwise
+outputs are synthesized from the SkillSpec (produces + success_key).
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 import uuid
@@ -17,6 +24,13 @@ import click
 from loom_cli.scaffold import die
 
 LAYOUT_VERSION = 1
+
+
+def _default_domains_dir() -> Path:
+    """The repo's local domains dir (dev fallback for uninstalled domains)."""
+    # main.py lives at <repo>/packages/loom_cli/src/loom_cli/main.py → parents[4]
+    # is the repo root.
+    return Path(__file__).resolve().parents[4] / "domains"
 
 
 def _load_config_or_default() -> dict[str, Any]:
@@ -39,69 +53,89 @@ def _load_config_or_default() -> dict[str, Any]:
     return load_config_from_dict({}).model_dump()
 
 
-def _build_registry(catalog, nodes, domains_dir: Path | None = None) -> Any:
+def _load_local_domains(registry: Any, domains_dir: Path) -> None:
+    """Dev fallback: import `<pkg>.plugin` from each `domains/*/src` directory.
+
+    Convention: directory name under `src/` = importable package name; the
+    plugin module exposes a `plugin` instance (the entry-point target). Entry
+    points win over local loading (a known id is never double-registered).
+    """
+    seen = {r.plugin.id for r in registry.all()}
+    for domain_dir in sorted(domains_dir.iterdir()):
+        src = domain_dir / "src"
+        if not src.is_dir():
+            continue
+        packages = sorted(p for p in src.iterdir() if (p / "__init__.py").exists())
+        for pkg in packages:
+            try:
+                if str(src) not in sys.path:
+                    sys.path.insert(0, str(src))
+                mod = importlib.import_module(f"{pkg.name}.plugin")
+                obj = getattr(mod, "plugin", None)
+                plugin_id = getattr(obj, "id", None)
+                if obj is None or plugin_id is None or plugin_id in seen:
+                    continue
+                registry.register(obj)
+                seen.add(plugin_id)
+            except Exception as exc:  # a broken local domain must not kill the CLI
+                click.echo(f"warning: failed to load local domain {pkg.name!r}: {exc}", err=True)
+
+
+def _build_registry(catalog: Any, nodes: Any, domains_dir: Path | None = None) -> Any:
     """Discover domains via entry_points + (optionally) a local domains dir."""
     from loom_kernel.spi import DomainRegistry, discover_entry_points
 
     registry = DomainRegistry()
     for plugin in discover_entry_points():
         registry.register(plugin)
-    # If a local domains dir is provided (dev mode), also register tiny manually
-    # so it works without an installed entry point.
-    if domains_dir is not None and (domains_dir / "tiny").exists():
-        try:
-            sys.path.insert(0, str(domains_dir / "tiny" / "src"))
-            from tiny.plugin import TinyPlugin  # type: ignore[import-not-found]
-
-            # Override the source_dir from CLI args later; for discovery use a placeholder.
-            registry.register(TinyPlugin(source_dir="."))
-        except Exception as exc:  # pragma: no cover
-            click.echo(f"warning: failed to load local tiny domain: {exc}", err=True)
+    if domains_dir is not None and domains_dir.exists():
+        _load_local_domains(registry, domains_dir)
     registry.contribute_to(catalog, nodes)
     return registry
 
 
-def _build_mock_dispatcher(*, store, registry, backend, declared_writes_for) -> Any:
-    """Build an AgentDispatcher that simulates the Agent writing a success result.
+def _build_mock_dispatcher(*, reg: Any) -> Any:
+    """Build an AgentDispatcher that simulates a successful Agent.
 
-    For the M4 walking-skeleton this shortcuts the real SessionRunner; a real
-    deployment wires the SessionRunner here with the configured backend.
+    Domain-shaped outputs come from the plugin's optional `mock_outputs` hook
+    (mock data is domain knowledge); otherwise we synthesize `{key: True}` over
+    the SkillSpec's produces + success_key. The engine validates the outputs
+    against the result contract (skills/validators) and writes the canonical
+    result file itself — the dispatcher only supplies the outputs dict.
     """
 
     def _dispatch(
         *,
-        node_run,
-        ctx,
-        executor,
-        store,
-        attempt,
+        node_run: Any,
+        ctx: Any,
+        executor: Any,
+        store: Any,
+        attempt: int,
     ) -> dict[str, Any]:
-        from loom_kernel.state import K
-
-        node_key = node_run.node_key
-        outputs: dict[str, Any]
-        if node_key == "work":
-            outputs = {"work_ok": True}
-        elif node_key == "report":
-            outputs = {"report_ok": True}
-        else:
-            outputs = {}
-        store.write_json(
-            K.result(node_run.node_run_id, attempt),
-            {
-                "status": "success",
-                "success": True,
-                "node_run_id": node_run.node_run_id,
-                "node_type": node_run.node_type,
-                "skill": executor.skill or "",
-                "outputs": outputs,
-            },
-            kind="session_result",
-            written_by={"role": "agent", "backend": "mock"},
-        )
-        return outputs
+        if reg.mock_outputs is not None:
+            outputs = reg.mock_outputs(node_run.node_type, ctx)
+            if outputs is not None:
+                return dict(outputs)
+        skill = reg.skills.get(executor.skill or "")
+        if skill is None:
+            return {}
+        keys = set(skill.produces) | {skill.success_key}
+        return {k: True for k in sorted(keys)}
 
     return _dispatch
+
+
+def _configure_plugin_source(reg: Any, items_dir: str) -> None:
+    """Pass the --items dir to plugins that keep a `_source_dir` attribute.
+
+    Mirrors the server's `configure_domain` convention. Templates are re-pulled
+    afterwards because a domain may embed the configured value in node params
+    (e.g. novel_digest's ensure_workspace workspace_root).
+    """
+    plugin = reg.plugin
+    if hasattr(plugin, "_source_dir"):
+        plugin._source_dir = items_dir  # documented config convention (see server)
+        reg.templates = list(plugin.templates())
 
 
 @click.group()
@@ -127,59 +161,45 @@ def run(
     dry_run: bool,
 ) -> None:
     """Run a domain's default template end-to-end."""
-    from loom_agent.backends.mock import MockBackend
     from loom_kernel.dag import NodeRegistry
     from loom_kernel.dag.instantiator import ShardPlan, instantiate
     from loom_kernel.engine import run_graph
     from loom_kernel.executors import ExecutorCatalog
-    from loom_kernel.planning import fixed_size
     from loom_kernel.planning.item import ItemLedgerSnapshot
-    from loom_kernel.state import StateStore
+    from loom_kernel.state import K, StateStore
 
-    # Discover domains + assemble catalogs.
+    # Discover domains + assemble catalogs (kernel builtins included).
     catalog = ExecutorCatalog()
     nodes = NodeRegistry()
-    registry = _build_registry(
-        catalog, nodes, domains_dir=Path(__file__).resolve().parents[2] / "domains"
-    )
-    # Register a noop builtin handler for the tiny.init node (no workspace setup needed).
-    from loom_kernel.dag import ContextPatch, NodeContract
-
-    class _NoopInit:
-        contract = NodeContract(writes=("initialized",))
-
-        def run(self, ctx: object) -> ContextPatch:  # type: ignore[override]
-            return ContextPatch(values={"initialized": True})
-
-    nodes.register("tiny.init", _NoopInit())
+    registry = _build_registry(catalog, nodes, domains_dir=_default_domains_dir())
     try:
         reg = registry.get(domain)
     except KeyError as exc:
-        die(str(exc), exit_code=3)
-        return
+        sys.exit(die(str(exc), exit_code=3))
 
-    # Override tiny's source_dir from --items.
-    if domain == "tiny":
-        reg.plugin._source_dir = items_dir  # type: ignore[attr-defined]
-    # Build the item ledger synchronously (tiny uses sync file scan).
+    _configure_plugin_source(reg, items_dir)
+    # Build the item ledger synchronously (domain sources do a local file scan).
     src = reg.plugin.item_source()
     import asyncio as _aio
 
-    async def _refresh():
+    async def _refresh() -> ItemLedgerSnapshot:
         return await src.refresh(type("Ws", (), {"root": items_dir})())
 
     snap: ItemLedgerSnapshot = _aio.run(_refresh())
     items = snap.items
     if not items:
-        die(f"no items found in {items_dir}", exit_code=3)
-        return
-    # Shard plan.
-    plans = fixed_size(items, snap.milestones, {"size": max(1, len(items) // shards or 1)})
+        sys.exit(die(f"no items found in {items_dir}", exit_code=3))
+    # Shard plan via the domain's sharder (default: fixed_size). `--shards` is a
+    # hint: fixed_size reads `size`; weighted-style sharders read `shards`.
+    cfg = {"size": max(1, len(items) // shards or 1), "shards": shards}
+    plans = reg.sharder.suggest(items, snap.milestones, cfg) if reg.sharder else []
     if not plans:
         plans = [ShardPlan(shard_id="shard-000", index=0, items=tuple(i.id for i in items))]
     click.echo(f"domain={domain} items={len(items)} shards={len(plans)}")
+    if not reg.templates:
+        sys.exit(die(f"domain {domain!r} declares no templates", exit_code=3))
     if dry_run:
-        click.echo("dry-run: would run template " + reg.templates()[0].id)
+        click.echo("dry-run: would run template " + reg.templates[0].id)
         return
     # Set up StateStore.
     config = _load_config_or_default()
@@ -187,28 +207,13 @@ def run(
     data_dir = Path(config["data_dir"])
     store_root = data_dir / run_id
     store = StateStore(store_root, run_id=run_id)
-    # Mock backend: register a script per node_type that writes success.
-    mock = MockBackend(store=store)
-    for spec in reg.executors:
-        if spec.handler_kind == "agent":
-            outputs = {"work_ok": True} if spec.skill == "tiny-work" else {"report_ok": True}
-            mock.register(
-                spec.key,
-                __import__("loom_agent").backends.mock.MockScript(
-                    result_body={
-                        "status": "success",
-                        "success": True,
-                        "node_run_id": "",
-                        "node_type": spec.key,
-                        "skill": spec.skill or "",
-                        "outputs": outputs,
-                    },
-                ),
-            )
-    dispatcher = _build_mock_dispatcher(
-        store=store, registry=registry, backend=mock, declared_writes_for=lambda nt: None
-    )
-    # Instantiate + run.
+    # Seed the per-item ledger entries into the control layer (§14.3 tree shape).
+    for it in items:
+        store.write_json(
+            K.item(it.id), it.to_dict(), kind="work_item", written_by={"role": "orchestrator"}
+        )
+    dispatcher = _build_mock_dispatcher(reg=reg)
+    # Instantiate + run. skills/validators wire the result contract (K3).
     tpl = reg.templates[0]
     tpl.validate()
     graph = instantiate(template=tpl, run_id=run_id, shards=plans, node_registry=nodes)
@@ -219,6 +224,8 @@ def run(
         catalog=catalog,
         node_registry=nodes,
         agent_dispatcher=dispatcher,
+        skills=reg.skills,
+        validators=reg.validators,
     )
     store.save_index()
     click.echo(
@@ -236,7 +243,7 @@ def domains() -> None:
 
     catalog = ExecutorCatalog()
     nodes = NodeRegistry()
-    registry = _build_registry(catalog, nodes)
+    registry = _build_registry(catalog, nodes, domains_dir=_default_domains_dir())
     out = [
         {"id": r.plugin.id, "label": r.plugin.label, "version": r.plugin.version}
         for r in registry.all()

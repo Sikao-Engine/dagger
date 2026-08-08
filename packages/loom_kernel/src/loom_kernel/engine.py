@@ -15,14 +15,21 @@ engine stays free of HTTP/async. Builtin nodes run their NodeHandler directly.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from .dag import ContextPatch, NodeContext, NodeRegistry, apply_edge_map
-from .dag.instantiator import NodeRun, NodeRunGraph, ShardPlan, expand_dynamic
-from .dag.template import DagTemplate, Scope
+from .dag.instantiator import (
+    NodeRun,
+    NodeRunGraph,
+    ShardPlan,
+    _node_run_id,
+    expand_dynamic,
+)
+from .dag.template import DagTemplate, EdgeDef, EdgeKind, Scope
 from .executors import ExecutorCatalog, ExecutorSpec
+from .spi import ResultValidator, SkillSpec
 from .state import K, StateStore
 from .state.retry import RetryPolicy
 from .state.schema import SchemaError
@@ -89,6 +96,8 @@ def run_graph(
     agent_dispatcher: AgentDispatcher | None = None,
     hooks: EngineHooks | None = None,
     max_node_retries: int = 3,
+    skills: Mapping[str, SkillSpec] | None = None,
+    validators: Mapping[str, ResultValidator] | None = None,
 ) -> EngineRun:
     """Run a NodeRunGraph to completion.
 
@@ -96,6 +105,12 @@ def run_graph(
     next wave becomes ready. Failures propagate: a failed node blocks its
     descendants (they are marked skipped). Dynamic-shard nodes expand when their
     seed returns`.
+
+    ``skills`` / ``validators`` wire the result contract (design §5.2) into the
+    engine: an agent node's outputs are checked against its SkillSpec.produces
+    (fail-fast, retryable), then the domain `ResultValidator` for the node_type
+    validates the full result body. Hosts that don't pass them get the legacy
+    behavior (no agent-side contract enforcement).
     """
     result = EngineRun()
     # Per-node accumulated ancestor context patches (already edge-mapped).
@@ -146,6 +161,8 @@ def run_graph(
                     context_inputs=context_inputs,
                     max_retries=max_node_retries,
                     hooks=hooks,
+                    skills=skills,
+                    validators=validators,
                 )
             except NodeFailed as exc:
                 failed.add(nid)
@@ -267,6 +284,8 @@ def _run_one_node(
     context_inputs: dict[str, list[ContextPatch]],
     max_retries: int,
     hooks: EngineHooks | None,
+    skills: Mapping[str, SkillSpec] | None = None,
+    validators: Mapping[str, ResultValidator] | None = None,
 ) -> dict[str, Any]:
     """Run one node to success or failure. Handles retries + state writes."""
     executor = catalog.require(node.node_type)
@@ -322,6 +341,13 @@ def _run_one_node(
             last_error = exc.reason
             attempt += 1
             continue
+        # Result contract enforcement for agent nodes (design §5.2 rule 5).
+        # Fail-fast into the retry path.
+        contract_error = _check_agent_outputs(executor=executor, outputs=outputs, skills=skills)
+        if contract_error:
+            last_error = contract_error
+            attempt += 1
+            continue
         # Write the result contract.
         result_body = {
             "status": "success",
@@ -332,6 +358,14 @@ def _run_one_node(
             "outputs": outputs,
             "summary": "",
         }
+        # Domain ResultValidator SPI (design §5.2): non-empty errors = failure.
+        validator_error = _run_result_validator(
+            node=node, body=result_body, ctx=ctx, validators=validators
+        )
+        if validator_error:
+            last_error = validator_error
+            attempt += 1
+            continue
         store.write_json(
             K.result(node.node_run_id, attempt),
             result_body,
@@ -344,27 +378,93 @@ def _run_one_node(
     raise NodeFailed(node.node_run_id, last_error or "max retries exhausted")
 
 
+def _check_agent_outputs(
+    *,
+    executor: ExecutorSpec,
+    outputs: dict[str, Any],
+    skills: Mapping[str, SkillSpec] | None,
+) -> str:
+    """Enforce `outputs ⊆ SkillSpec.produces ∪ {success_key}` for agent nodes.
+
+    Returns an error string on violation (empty = ok). This is design §5.2
+    rule 5, previously deferred to "the dispatcher layer" and never enforced.
+    """
+    if executor.handler_kind != "agent" or skills is None or not executor.skill:
+        return ""
+    skill_spec = skills.get(executor.skill)
+    if skill_spec is None:
+        return ""
+    allowed = set(skill_spec.produces) | {skill_spec.success_key}
+    undeclared = sorted(k for k in outputs if k not in allowed)
+    if not undeclared:
+        return ""
+    return (
+        f"outputs violate SkillSpec {skill_spec.key!r}: undeclared keys "
+        f"{undeclared} (declared: {sorted(allowed)})"
+    )
+
+
+def _run_result_validator(
+    *,
+    node: NodeRun,
+    body: dict[str, Any],
+    ctx: NodeContext,
+    validators: Mapping[str, ResultValidator] | None,
+) -> str:
+    """Run the domain ResultValidator for this node_type. Returns error string ("" = ok)."""
+    if validators is None:
+        return ""
+    validator = validators.get(node.node_type)
+    if validator is None:
+        return ""
+    errors = validator(
+        body,
+        node_run_id=node.node_run_id,
+        context={**ctx.values(), "shard": dict(ctx.shard)},
+    )
+    if not errors:
+        return ""
+    return "result validator failed: " + "; ".join(errors)
+
+
 def _resolve_context(
     *,
     node: NodeRun,
     graph: NodeRunGraph,
     context_inputs: dict[str, list[ContextPatch]],
 ) -> NodeContext:
-    """Merge ancestor patches (de-conflicted) + run config + shard seed + node params."""
+    """Merge ancestor patches (de-conflicted) + run config + shard seed + node params.
+
+    The shard view is enriched from the run's shard plan so prompt templates can
+    reference `{{ shard.item_count }}` / `{{ shard.first_item.id }}` /
+    `{{ shard.last_item.id }}` (inclusive-boundary prompts depend on these).
+    """
     patches = context_inputs.get(node.node_run_id, [])
     merged = ContextPatch.merge(*patches) if patches else ContextPatch(values={})
+    shard_seed: dict[str, Any] = {
+        "shard_id": node.shard_id or "",
+        "shard_index": node.shard_index if node.shard_index is not None else -1,
+    }
+    shard_view: dict[str, Any] = {
+        "shard_id": node.shard_id or "",
+        "index": node.shard_index if node.shard_index is not None else 0,
+    }
+    if node.shard_index is not None:
+        plan = next((s for s in graph.shards if s.index == node.shard_index), None)
+        if plan is not None:
+            items = [str(i) for i in plan.items]
+            shard_seed["item_count"] = len(items)
+            shard_view["item_count"] = len(items)
+            shard_view["items"] = items
+            shard_view["first_item"] = {"id": items[0]} if items else None
+            shard_view["last_item"] = {"id": items[-1]} if items else None
     return NodeContext(
         run_config={"run_id": graph.run_id, "template_id": graph.template_id},
-        shard_seed={
-            "shard_id": node.shard_id or "",
-            "shard_index": node.shard_index if node.shard_index is not None else -1,
-        },
+        shard_seed=shard_seed,
         ancestor_patches=dict(merged.values),
         node_params={k: v for k, v in node.params.items() if not k.startswith("_")},
-        shard={
-            "shard_id": node.shard_id or "",
-            "index": node.shard_index if node.shard_index is not None else 0,
-        },
+        run={"run_id": graph.run_id, "template_id": graph.template_id},
+        shard=shard_view,
     )
 
 
@@ -409,27 +509,71 @@ def _propagate(
     template: DagTemplate,
     context_inputs: dict[str, list[ContextPatch]],
 ) -> None:
-    """Push this node's outputs to descendant nodes per outgoing edges (with maps)."""
+    """Push this node's outputs to descendant nodes per outgoing edges (with maps).
+
+    Delivery targets follow edge semantics — context flows **along edges**, so an
+    INTRA edge delivers to the same shard only (a shard's outputs never leak into
+    a sibling shard's context, where distinct per-shard values would collide as
+    false ContextConflictError s), a SERIAL_PREV edge delivers to the next shard
+    only, and ALL/LAST deliver to the single run-scope target.
+    """
     patch = ContextPatch(values=dict(outputs), source_node_run_id=node.node_run_id)
     for edge in template.edges:
         if edge.source != node.node_key:
             continue
-        # For each shard of the target, the patch is delivered (possibly mapped).
-        target_scope = template.node(edge.target).scope
-        if target_scope in (Scope.RUN, Scope.RUN_ENTRY):
-            t_id = f"{graph.run_id}__{edge.target}"
+        for t_id in _edge_targets(edge=edge, node=node, graph=graph, template=template):
             mapped = apply_edge_map(patch, edge.maps)
             context_inputs.setdefault(t_id, []).append(mapped)
-        elif target_scope is Scope.SHARD:
-            for sh in graph.shards:
-                t_id = f"{graph.run_id}__{edge.target}__s{sh.index:03d}"
-                mapped = apply_edge_map(patch, edge.maps)
-                context_inputs.setdefault(t_id, []).append(mapped)
-        elif target_scope is Scope.SHARD_DYNAMIC:
-            # Dynamic targets are expanded later; record patch on the seed for now.
-            t_id = f"{graph.run_id}__{edge.target}"
-            mapped = apply_edge_map(patch, edge.maps)
-            context_inputs.setdefault(t_id, []).append(mapped)
+
+
+def _edge_targets(
+    *,
+    edge: EdgeDef,
+    node: NodeRun,
+    graph: NodeRunGraph,
+    template: DagTemplate,
+) -> list[str]:
+    """Resolve which concrete target instances receive this node's output patch."""
+    target_scope = template.node(edge.target).scope
+    run_id = graph.run_id
+    targets: list[str] = []
+    if edge.kind is EdgeKind.INTRA:
+        if node.scope is Scope.SHARD and target_scope is Scope.SHARD:
+            # Same-shard delivery only.
+            targets = [_node_run_id(edge.target, node.shard_index, run_id)]
+        else:
+            # Run-level INTRA: the single target instance.
+            targets = [_node_run_id(edge.target, None, run_id)]
+    elif edge.kind is EdgeKind.SERIAL_PREV:
+        nxt = _next_shard_index(graph, node.shard_index)
+        if nxt is not None:
+            targets = [_node_run_id(edge.target, nxt, run_id)]
+    elif edge.kind is EdgeKind.RUN_ENTRY:
+        if graph.shards:
+            targets = [_node_run_id(edge.target, graph.shards[0].index, run_id)]
+    elif edge.kind is EdgeKind.RUN_ENTRY_ALL:
+        targets = [_node_run_id(edge.target, sh.index, run_id) for sh in graph.shards]
+    elif edge.kind is EdgeKind.LAST:
+        if node.shard_index is not None and graph.shards[-1].index == node.shard_index:
+            targets = [_node_run_id(edge.target, None, run_id)]
+    elif edge.kind is EdgeKind.ALL:
+        targets = [_node_run_id(edge.target, None, run_id)]
+    else:
+        # SHARD_DYNAMIC targets are expanded later; record the patch on the seed id.
+        targets = [_node_run_id(edge.target, None, run_id)]
+    return targets
+
+
+def _next_shard_index(graph: NodeRunGraph, shard_index: int | None) -> int | None:
+    """The shard index following `shard_index` in the plan's order (None if last)."""
+    if shard_index is None:
+        return None
+    for pos, sh in enumerate(graph.shards):
+        if sh.index == shard_index:
+            if pos + 1 < len(graph.shards):
+                return graph.shards[pos + 1].index
+            return None
+    return None
 
 
 __all__ = [

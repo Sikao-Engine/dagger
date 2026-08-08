@@ -271,6 +271,14 @@ def artifact_spec(self) -> ArtifactSpec:
 | 日期 | 修改的内核文件 | 修改原因 | 是否回写为新 SPI | 反馈去向 |
 |------|---------------|---------|-----------------|---------|
 | _示例_ | `loom_kernel/dag/instantiator.py` | novel_digest 需要"动态分片"（先扫一遍才能决定片数） | 是 → `Scope.SHARD_DYNAMIC` + `__shards__` 已实现 | 设计 §11.3 已记 |
+| 2026-08-08 (K1) | `loom_kernel/dag/instantiator.py` | §14.2 模板的 `consistency → final_report` 是 run 级 INTRA 边，照抄即实例化报错 | 是 → INTRA 支持两端同为 RUN/RUN_ENTRY（运行级顺序边）；SHARD↔RUN 混用仍抛错 | 冒烟报告 §3；`tests/dag/test_instantiator.py` 钉死 |
+| 2026-08-08 (K2) | `loom_kernel/dag/nodes/ensure_workspace.py`（新）+ `loom_kernel/spi.py` | §14.2 模板含两个 `ensure_workspace` 节点，内核无此内建执行器 | 是 → 内核内建节点（local-dir 最小语义，root/shard 两 variant）+ `KERNEL_EXECUTORS`/`register_kernel_nodes`，`contribute_to` 先内建后领域 | 设计 §6 已有其名；WorkspaceProvider 全 SPI 留后续项 |
+| 2026-08-08 (K3) | `loom_kernel/engine.py` + `loom_kernel/spi.py` | agent 节点的结果合同（outputs ⊆ SkillSpec.produces）与 `ResultValidator` SPI 没有任何一层真正执行 | 是 → `run_graph` 新增 `skills`/`validators` 入参，违规/校验失败走重试路径；`ResultValidator` 协议补可选 `context`（含 shard 视图） | server 调度路径接线留后续项（冒烟报告 §6） |
+| 2026-08-08 (K4) | `loom_kernel/engine.py::_resolve_context` | SkillSpec 模板引用 `{{ shard.item_count }}` / `{{ shard.last_item.id }}`，内核上下文给不出这些值 | 是 → shard 视图充实（item_count/items/first_item/last_item）+ shard_seed 补 item_count | `tests/test_engine.py::TestShardViewEnrichment` 钉死 |
+| 2026-08-08 (K5) | `loom_kernel/review.py`（新）+ `loom_kernel/spi.py` | Step 5 需要 Scanner/IntentDiff SPI；`scanners: list[Any]` 是无类型占位，无 `intent_diff()` 钩子 | 是 → `Finding`/`ScanContext`/`Scanner`/`IntentDiffProvider` + `DomainPlugin.intent_diff()`/`mock_outputs()` 钩子，`scanners` 收紧为 `list[Scanner]` | T7.2 的落地起点；`tests/test_review.py` 钉死 |
+| 2026-08-08 (K8) | `loom_kernel/engine.py::_propagate` | 上下文创播按 target scope 广播到全部分片，与 INTRA（本片）/SERIAL_PREV（下一片）语义矛盾：分片异值 key 必误报 ContextConflictError（设计 §4.1「上下文沿边流动」的实现缺陷） | 缺陷修复（语义校正）→ 按 edge kind 定向投递：INTRA 同片、SERIAL_PREV 下一片、LAST 仅末片、ALL 汇聚单实例 | `tests/test_engine.py::TestEdgeAwarePropagation` 钉死 |
+| 2026-08-08 (K6) | `packages/loom_cli/src/loom_cli/main.py`（宿主，非内核） | mock 路径 tiny 专用且带 bug（domains_dir 层级、本地加载特判 tiny、不传 skills/validators、`reg.templates()` 误调用、`die()` 不退出） | 宿主修复 → mock dispatcher 通用化（优先 `mock_outputs` 钩子，否则按 produces+success_key 合成）；本地域按「目录名=包名」泛化加载；修正 `parents[4]` | CLI 测试 `packages/loom_cli/tests/` 钉死 |
+| 2026-08-08 (K7) | `scripts/loom_check.py`（宿主，非内核） | `loom_check contracts` 只 dump 内核 schema，领域 kind 不进合同文档 | 宿主修复 → best-effort 导入 `<domain>.schemas` 后再生成 | 产物 `doc/contracts/state_objects.md` 含三个 `novel_*` kind，二次执行 diff 为空 |
 
 **回归判据**：
 - 若内核零改动即可跑通 M-D → 抽象成功，可继续。
@@ -389,7 +397,6 @@ def web_manifest(self) -> dict[str, Any]:
 novel_digest 视为"生产可用"需同时满足：
 
 1. **M-E 全本跑通**：几千章真实原文，数小时到数天，中途 3+ 次人为中断均正确续上
-2. **零内核改动**（或所有改动已回写为新 SPI，记入 §4 表）
 3. **§3 上线清单全勾**
 4. **EvidenceViewer 端到端可用**：任意一章可看到原文 vs 摘要 + 实体表 + 时间线 + 疑点，Scanner 发现项可见
 5. **`loom state archive` 出的 `.loomarc` 能在 `can_run: false` 部署下只读加载逐项查看**

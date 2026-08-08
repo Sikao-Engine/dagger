@@ -1,5 +1,3 @@
-
-
 """ArtifactSpec / Slot / ArtifactStore: the domain-declared shape of per-item
 artifacts and how the review UI should render them.
 
