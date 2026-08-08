@@ -1,7 +1,5 @@
 """ExecutorSpec: self-describing node-type catalog entry.
-
-Replaces CubeClaw's `executors/catalog.py` compiled constant. Now: domains
-register their executors at startup; the catalog is the lookup table. `platform`
+domains register their executors at startup; the catalog is the lookup table. `platform`
 has been generalized to `selectors: dict[str, str]` so domains can prune on any
 dimension (GPU/no-GPU, has-api-key, language pipeline).
 """
