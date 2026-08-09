@@ -1,0 +1,1 @@
+`python -m loom_check contracts`

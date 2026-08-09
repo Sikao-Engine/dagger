@@ -12,10 +12,8 @@ dependencies = [
     "litestar>=2.0",
     "pydantic>=2.0",
     "anyio>=4.4",
+    "uvicorn>=0.30",
 ]
-
-[project.optional-dependencies]
-serve = ["uvicorn>=0.30"]
 
 [build-system]
 requires = ["hatchling"]

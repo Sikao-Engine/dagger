@@ -1,0 +1,26 @@
+# Loom server config — copy this file anywhere, edit, then run:
+#
+#     uv run server/main_server.py -c path/to/your.toml
+#
+# All relative paths resolve against THIS FILE's directory, so the config is
+# portable: it never depends on where you launch the command from.
+
+# Required. The working directory Loom opens: run state trees live under
+# <workspace>/.loom, the SQLite DB defaults to <workspace>/loom.db.
+# For the novel_digest domain this is the book dir containing chapters/*.txt.
+workspace = "../my-book"
+
+# Bind address of the HTTP server (UI + REST + SSE).
+# host = "127.0.0.1"
+# port = 8000
+
+# Where run state trees live. Default: <workspace>/.loom
+# data_dir = ".loom"
+
+# SQLAlchemy URL. Default: sqlite at <workspace>/loom.db
+# db_url = "sqlite:///loom.db"
+
+# Built frontend bundle (`cd web && pnpm build` output). When set, the SPA is
+# served at `/` with deep-link fallback; drop the key to run API-only.
+# Relative to this file — from a copy kept at the repo root: "web/dist".
+web_dist = "web/dist"

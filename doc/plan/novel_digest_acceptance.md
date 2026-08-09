@@ -4,7 +4,9 @@
 >
 > 本文不手把手写完 `novel_digest` 插件；它给你一张地图 + 每一站的验收判据，让你在实际工作中按里程碑推进、按判据收口。设计基线在 `doc/design/universal_base_architecture.md` §14 和 `doc/design/domain_plugin_cookbook.md`，本文是它们在落地维度的展开。
 >
-> 配套代码起点：`domains/novel_digest/`（空壳包，已注册 entry point）。参考实现在 `domains/tiny/`（最小可跑通 SPI）。
+> 配套代码：`domains/novel_digest/`（插件 + noveltool + skill 源文件）。参考实现在 `domains/tiny/`（最小可跑通 SPI）。
+>
+> **先读 §0.5**：验收在「你自己的工作区」里进行，不在仓库里。四步安装把 skill / noveltool / 前端 / server 全部与仓库路径解耦，之后文中所有命令里的 `<workspace>` 都指你配置的那本书目录。
 
 ---
 
@@ -22,6 +24,56 @@
 **拓扑选择**：cookbook 模式 C（主链串行 + 侧链并行）的精简变体——
 `digest` 主链 + `timeline_merge` 串行累积 + `entity_merge`/`volume_summary` 并行 + `consistency`/`final_report` 汇聚。
 与设计 §14.2 的 `NOVEL_DIGEST_TEMPLATE` 一致，与 CubeClaw GlobalBatch 拓扑同构（这是抽象成立的核心证据）。
+
+---
+
+## 0.5 环境安装（一次性，与工作区解耦）
+
+以下四步把 Loom 从「仓库里的代码」变成「可打开任意工作区的部署」。**所有里程碑都在你自己的工作区里验收**——一个含 `chapters/*.txt` 的书目录，不再依赖仓库路径。四步的命令只需在仓库里执行一次。
+
+### Step 1 — 安装 Agent 侧 skill
+
+```bash
+uv run domains/novel_digest/install.py
+```
+
+把 `skills_md/` 下四个 SKILL.md（`novel-digest` / `novel-volume-summary` / `novel-consistency` / `novel-final-report`，即 SkillSpec prompt 里 `/xxx` 指令对应的 SOP 文档）安装到 `~/.agents/skills/`。`--dest` 可换成你的 agent CLI 实际 skills 目录（如 `~/.claude/skills`、项目级 `.kimi/skills`）；`--dry-run` 预演。幂等，可重复执行。
+
+**验收**：`~/.agents/skills/novel-digest/SKILL.md` 存在；重跑全部显示 `unchanged`。
+
+### Step 2 — 安装 noveltool 命令行工具
+
+```bash
+cd domains/novel_digest/noveltool && uv tool install -e .
+```
+
+`noveltool` 进入 PATH（uv tool bin 目录），从此**在任何目录可用**，与仓库脱钩；实现随仓库 editable 联动。
+
+**验收**：在任意非仓库目录执行 `noveltool status --root <workspace> --out <临时目录>`，输出 JSON 且退出码 0。
+
+### Step 3 — 编译前端
+
+```bash
+cd web && pnpm install && pnpm build
+```
+
+产物 `web/dist/`，由 server 静态托管（`/api/*` 走 API，其余路径 SPA fallback 到 `index.html`）。
+
+**验收**：`web/dist/index.html` 存在。
+
+### Step 4 — 配置并在指定工作区启动 server
+
+```bash
+cp config.example.toml my-loom.toml   # 放哪都行；相对路径相对配置文件解析
+# 编辑：workspace = 你的书目录；web_dist = web/dist（相对 my-loom.toml 或绝对路径）
+uv run server/main_server.py -c my-loom.toml
+```
+
+server 在 `workspace` 下创建 `.loom/`（state 树）与 `loom.db`，在 `http://127.0.0.1:8000` 托管 UI + REST + SSE。仓库里只保留 `config.example.toml`，真实配置不入库。
+
+**验收**：`curl http://127.0.0.1:8000/api/v1/domains` 返回含 `novel_digest`；浏览器打开 `/` 看到前端；`/runs/<任意id>` 深链返回 SPA 页面；`curl /api/v1/nope` 返回 JSON 404。
+
+> 不带 `-c` 时退回旧行为：当前目录为工作区（`./loom.db` + `./.loom`），`LOOM_DB_URL` / `LOOM_DATA_DIR` / `LOOM_HOST` / `LOOM_PORT` 环境变量仍有效；`python -m loom_server -c <config>` 等价。
 
 ---
 
@@ -156,16 +208,17 @@ def artifact_spec(self) -> ArtifactSpec:
 **目标**：验证 SPI 五件套（ItemSource / Executor / Template / Skill / ArtifactSpec）的最小闭环。
 
 **做法**：
-1. 在 `domains/novel_digest/src/novel_digest/plugin.py` 写最小 `NovelPlugin`（参考 `domains/tiny/src/tiny/plugin.py` 形状）
-2. 用 mock 后端（`backend: mock`）跑一章
-3. scheduler mock `_seed_mock_artifacts` 会按声明的 spec 种子化产物 → EvidenceViewer 有东西可看
+1. 准备一个工作区 `<workspace>`（含 `chapters/*.txt` 的书目录）。没有真书时用 fixture 生成器造一本：`uv run python -m novel_digest.testing <workspace> --chapters 5`
+2. 在 `domains/novel_digest/src/novel_digest/plugin.py` 写最小 `NovelPlugin`（参考 `domains/tiny/src/tiny/plugin.py` 形状）
+3. 用 mock 后端（`backend: mock`）跑一章
+4. scheduler mock `_seed_mock_artifacts` 会按声明的 spec 种子化产物 → EvidenceViewer 有东西可看
 
 **验收判据**：
-- [ ] `loom run --domain novel_digest --items ./test_data/one_chapter --shards 1 --backend mock` 跑完无错
+- [ ] `uv run loom run --domain novel_digest --items <workspace> --shards 1 --backend mock` 跑完无错（或按 §0.5 Step 4 起 server 后在 UI 创建 mock run）
 - [ ] state 树结构符合 §14.3：`control/items/<id>.json` + `contract/<node_run_id>/attempt-1/result.json` + `artifact/items/<id>/summary.json`
-- [ ] `loom state ls --layer artifact` 看到种子的 slot
-- [ ] `/runs/:id/items/:id/evidence` 页面能展示 `summary` markdown slot
-- [ ] `loom state archive` 出的 `.loomarc` 能被只读加载逐项查看
+- [ ] `uv run loom state ls --layer artifact` 看到种子的 slot
+- [ ] `/runs/:id/items/:id/evidence` 页面能展示 `summary` markdown slot（server 已按 §0.5 Step 4 打开 `<workspace>`）
+- [ ] `uv run loom state archive` 出的 `.loomarc` 能被只读加载逐项查看
 
 ### M-B：单章真实 LLM
 
@@ -173,12 +226,12 @@ def artifact_spec(self) -> ArtifactSpec:
 
 **做法**：
 1. 起 `agentcli serve`（opencode-http 后端）
-2. 用 1–3 章真实原文跑 `noveltool next` 推进
+2. 用 1–3 章真实原文跑 `noveltool next` 推进（noveltool 已在 PATH，§0.5 Step 2）
 3. 看 Attempt 视图回放 transcript，确认 Agent 行为符合 prompt
 
 **验收判据**：
-- [ ] `loom run --domain novel_digest --backend opencode-http` 单章跑通
-- [ ] 单节点手工跑通过一次（不经 DAG）：`noveltool next` 直接跑，确认 prompt 与 CLI 配合无误
+- [ ] `uv run loom run --domain novel_digest --items <workspace> --backend opencode-http` 单章跑通
+- [ ] 单节点手工跑通过一次（不经 DAG）：`noveltool next --root <workspace> --out <shard_out_dir>` 直接跑，确认 prompt 与 CLI 配合无误
 - [ ] Attempt 流仅凭 SSE 可重建 transcript（不依赖后端日志）
 - [ ] 中途 kill 进程后重跑，能从 `cursor.json` 正确续上
 - [ ] 重跑已成功节点时幂等跳过（不重复烧 token）
@@ -228,7 +281,7 @@ def artifact_spec(self) -> ArtifactSpec:
 - [ ] 磁盘预算不打爆（如启用 `ResourceBudget` Hook，预警触发）
 - [ ] Blocked 时的通知渠道通了
 - [ ] `can_run: false` 部署下，前端可正常查看历史 Run + EvidenceViewer 全程可用
-- [ ] 全程 state 树通过 `loom state verify`（sha256 对账）无 corruption
+- [ ] 全程 state 树通过 `uv run loom state verify`（sha256 对账）无 corruption
 
 ---
 
@@ -303,12 +356,21 @@ def artifact_spec(self) -> ArtifactSpec:
 
 ## 5. 文件起点
 
-`domains/novel_digest/` 已有空壳：
+`domains/novel_digest/` 已有骨架：
 
 ```
 domains/novel_digest/
 ├── pyproject.toml          # entry_points: loom.domains = novel_digest = ...:plugin
 ├── README.md               # 任务画像 + 拓扑说明
+├── install.py              # §0.5 Step 1：把 skills_md/ 装进 ~/.agents/skills（--dest/--dry-run）
+├── skills_md/              # Agent 侧 SKILL.md 源文件（四个，对应 SkillSpec 的 /xxx 指令）
+│   ├── novel-digest/SKILL.md
+│   ├── novel-volume-summary/SKILL.md
+│   ├── novel-consistency/SKILL.md
+│   └── novel-final-report/SKILL.md
+├── noveltool/              # §0.5 Step 2：独立 uv tool 包（uv tool install -e . → noveltool 上 PATH）
+│   └── pyproject.toml      # 薄封装：entry point 指向 novel_digest.noveltool.cli:main，
+│                           #   [tool.uv.sources] 相对路径钉住领域包，与 workspace 解耦
 └── src/novel_digest/        # 你要写的：
     ├── __init__.py
     ├── plugin.py            # NovelPlugin（DomainPlugin SPI 实现）
@@ -316,7 +378,16 @@ domains/novel_digest/
     ├── skills.py            # NOVEL_DIGEST / NOVEL_VOLUME_SUMMARY / NOVEL_CONSISTENCY 三个 SkillSpec
     ├── scanners.py          # 五个 Scanner
     ├── nodes/               # entity_merge / timeline_merge 两个 builtin NodeHandler
-    └── noveltool/           # 确定性 CLI（noveltool status/next/fill/check）
+    └── noveltool/           # 确定性 CLI 实现（status/next/fill/check；noveltool/ 包只是它的壳）
+```
+
+server 侧新增（§0.5 Step 4）：
+```
+config.example.toml         # 仓库根：唯一入库的配置样例；真实配置放仓库外
+server/main_server.py       # uv run server/main_server.py -c <config>（等价 python -m loom_server）
+server/src/loom_server/
+├── config.py               # LoomConfig + load_config：TOML 加载，相对路径相对配置文件解析
+└── app.py                  # create_app(..., web_dist=...)：静态托管 web/dist + SPA fallback
 ```
 
 前端起点：
@@ -349,7 +420,7 @@ def web_manifest(self) -> dict[str, Any]:
 | `StateStore` 五层 | ✅ M1 | 章节产物入 `artifact/items/<id>/`，全局产物入 `artifact/run/<slot>` |
 | DAG 引擎 + SERIAL_PREV/ALL | ✅ M2 | 时间线串行 + 一致性汇聚直接用 |
 | `AgentBackend` Protocol | ✅ M3 | mock 跑 M-A，opencode-http 跑 M-B+ |
-| CLI walking skeleton | ✅ M4 | `loom run --domain novel_digest` 即可 |
+| CLI walking skeleton | ✅ M4 | `uv run loom run --domain novel_digest` 即可 |
 | server (REST + SSE + 调度) | ✅ M5 | 前端画布 / Attempt / State / Ledger / Planner 全套可用 |
 | 前端底座 | ✅ M6 | DAGCanvas / RunDetail / Attempt / StateBrowser / Ledger / Planner 全套 |
 | `ArtifactSpec` + REST + EvidenceViewer | ✅ M7 T7.1 + T6.9 | `artifact_spec()` 声明五 slot，EvidenceViewer 零前端改动展示 |
@@ -367,6 +438,7 @@ def web_manifest(self) -> dict[str, Any]:
 
 ## 7. 推进节奏建议
 
+0. **先做 §0.5 四步安装**——skill / noveltool / 前端 / server 全部就位后，后续里程碑都在 `<workspace>` 里进行。
 1. **先写 §1 Step 1 物化数据契约**——schema 文件是后续一切对齐的基准，先钉死。
 2. **M-A 单章 dry-run 用 mock 后端跑通**——验证 SPI 五件套闭环 + EvidenceViewer 可用，最低成本拿到反馈。
 3. **M-B 单章真实 LLM**——验证 prompt + noveltool + 后端协议对齐，这一关过了后面都是规模化问题。
@@ -382,13 +454,13 @@ def web_manifest(self) -> dict[str, Any]:
 
 | 症状 | 先查 | 再查 |
 |------|------|------|
-| `loom run` 报 SPI 错 | `plugin.py` 的 entry point 是否注册成功（`loom domains` 列表） | `DomainPlugin` 必需方法是否齐全 |
+| `loom run` 报 SPI 错 | `plugin.py` 的 entry point 是否注册成功（`uv run loom domains` 列表） | `DomainPlugin` 必需方法是否齐全 |
 | Agent 跑完但 `digest_ok` 不 true | SkillSpec 的 `success_key` 与 `session_result.outputs` 字段名是否一致 | `noveltool status` 的退出码 |
 | 时间线倒流 | `timeline_merge` 节点的 `maps` 是否把 `prev_timeline_path` 映射进来 | `SERIAL_PREV` 边是否连对（画布上看串行顺序） |
 | EvidenceViewer 显示 undeclared slot | Agent 写的 slot 名与 `artifact_spec.slots` 的 `name` 是否一致 | `K.artifact_item(item_id, slot)` 的 slot 拼写 |
 | 重跑烧 token | 节点是否幂等跳过（看 DAG 画布节点状态） | `cursor.json` 的 `cursor_item_id` 是否更新 |
 | `consistency` 节点不 ready | `entity_merge` / `volume_summary` 是否全部 success | `ALL` 边是否连对 |
-| state 树 corruption | `loom state verify`（sha256 对账） | 是否绕过 `StateStore.path` 直接拼路径（T0.4 守卫会抓） |
+| state 树 corruption | `uv run loom state verify`（sha256 对账） | 是否绕过 `StateStore.path` 直接拼路径（T0.4 守卫会抓） |
 
 ---
 
@@ -396,10 +468,11 @@ def web_manifest(self) -> dict[str, Any]:
 
 novel_digest 视为"生产可用"需同时满足：
 
+0. **§0.5 四步安装在一台干净机器上全部走通**（skill 进 `~/.agents/skills`、noveltool 上 PATH、`pnpm build` 产物、`-c <config>` 在指定工作区起 server）
 1. **M-E 全本跑通**：几千章真实原文，数小时到数天，中途 3+ 次人为中断均正确续上
-3. **§3 上线清单全勾**
-4. **EvidenceViewer 端到端可用**：任意一章可看到原文 vs 摘要 + 实体表 + 时间线 + 疑点，Scanner 发现项可见
-5. **`loom state archive` 出的 `.loomarc` 能在 `can_run: false` 部署下只读加载逐项查看**
-6. **前端 `/timeline` 页面可用**（领域自定义 route，走 `web_manifest` 注册）
+2. **§3 上线清单全勾**
+3. **EvidenceViewer 端到端可用**：任意一章可看到原文 vs 摘要 + 实体表 + 时间线 + 疑点，Scanner 发现项可见
+4. **`uv run loom state archive` 出的 `.loomarc` 能在 `can_run: false` 部署下只读加载逐项查看**
+5. **前端 `/timeline` 页面可用**（领域自定义 route，走 `web_manifest` 注册）
 
 满足这六条，本任务可作为 Loom 第二领域验收通过，抽象质量得到验证。同时为后续 `domains/code_batch`（CubeClaw 迁移）证明底座可承载真实生产负载。

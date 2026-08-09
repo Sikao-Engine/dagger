@@ -23,6 +23,8 @@ members = [
     "domains/novel_digest",
     "server",
 ]
+# Standalone uv-tool shim (installed via `uv tool install -e .`), not a workspace member.
+exclude = ["domains/novel_digest/noveltool"]
 
 [tool.uv.sources]
 loom_kernel = { workspace = true }

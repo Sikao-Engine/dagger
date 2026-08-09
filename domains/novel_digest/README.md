@@ -21,28 +21,43 @@ K1–K8 八处内核/宿主修复（全部带测试钉死，逐条见回归表�
 
 ## 如何跑
 
+一次性安装（与工作区解耦，详见 `doc/plan/novel_digest_acceptance.md` §0.5）：
+
+```bash
+uv run domains/novel_digest/install.py                # 1. skill → ~/.agents/skills
+cd domains/novel_digest/noveltool && uv tool install -e .   # 2. noveltool → PATH
+cd web && pnpm install && pnpm build                  # 3. 前端 → web/dist
+uv run server/main_server.py -c my-loom.toml          # 4. 按 config 打开工作区
+```
+
+开发与测试：
+
 ```bash
 uv sync
 uv run pytest domains/novel_digest -q          # 68 个领域测试
 # 手动冒烟（mock 后端，真实 CLI + 真实文件产出）
 uv run python -m novel_digest.testing /tmp/book --chapters 5
-loom run --domain novel_digest --items /tmp/book --shards 2 --backend mock
-noveltool status --root /tmp/book --out /tmp/book/<run_id>/shard-000
+uv run loom run --domain novel_digest --items /tmp/book --shards 2 --backend mock
+noveltool status --root /tmp/book --out /tmp/book/<run_id>/shard-000   # noveltool 已在 PATH
 ```
 
 ## 包结构
 
 ```
-src/novel_digest/
-├── plugin.py      # NovelPlugin（DomainPlugin SPI 全钩子）+ digest ResultValidator + WeightedChapterSharder
-├── items.py       # ChapterSource：扫 chapters/*.txt，卷边界 → Milestone，frontier 读 .loom/cursor.json
-├── templates.py   # build_template(workspace_root)：设计 §14.2 逐字照抄（8 节点 9 边）
-├── executors.py   # 6 个 ExecutorSpec（ensure_workspace 由内核提供）
-├── skills.py      # 4 个 SkillSpec + Jinja2 render_prompt（快照测试钉死）
-├── schemas/       # novel_chapter / novel_volume_summary / novel_consistency_report（进 SCHEMA_REGISTRY）
-├── nodes/         # entity_merge / timeline_merge 两个确定性 builtin NodeHandler
-├── noveltool/     # 确定性 CLI：status / next / fill / check（JSON + 退出码 0/1/2/3 + 幂等）
-├── scanners.py    # 5 个机械 Scanner（实现内核 review.Scanner 协议）
-├── review.py      # NovelIntentDiff（左原文节选 / 右摘要）
-└── testing.py     # 确定性 fixture 生成器（测试与手动冒烟共用）
+domains/novel_digest/
+├── install.py     # 装 skills_md/ 到 ~/.agents/skills（stdlib only，--dest/--dry-run，幂等）
+├── skills_md/     # Agent 侧 SKILL.md 源文件（四个，对应 SkillSpec 的 /xxx 指令）
+├── noveltool/     # 独立 uv tool 薄封装包（uv tool install -e . → noveltool 上 PATH）
+└── src/novel_digest/
+    ├── plugin.py      # NovelPlugin（DomainPlugin SPI 全钩子）+ digest ResultValidator + WeightedChapterSharder
+    ├── items.py       # ChapterSource：扫 chapters/*.txt，卷边界 → Milestone，frontier 读 .loom/cursor.json
+    ├── templates.py   # build_template(workspace_root)：设计 §14.2 逐字照抄（8 节点 9 边）
+    ├── executors.py   # 6 个 ExecutorSpec（ensure_workspace 由内核提供）
+    ├── skills.py      # 4 个 SkillSpec + Jinja2 render_prompt（快照测试钉死）
+    ├── schemas/       # novel_chapter / novel_volume_summary / novel_consistency_report（进 SCHEMA_REGISTRY）
+    ├── nodes/         # entity_merge / timeline_merge 两个确定性 builtin NodeHandler
+    ├── noveltool/     # 确定性 CLI 实现：status / next / fill / check（JSON + 退出码 0/1/2/3 + 幂等）
+    ├── scanners.py    # 5 个机械 Scanner（实现内核 review.Scanner 协议）
+    ├── review.py      # NovelIntentDiff（左原文节选 / 右摘要）
+    └── testing.py     # 确定性 fixture 生成器（测试与手动冒烟共用）
 ```

@@ -15,3 +15,26 @@ Loom splits the work into shards on a declarative DAG, drives AI agents through 
 What is Loom — Loom 是什么
 
 Loom is a domain-agnostic batch agent orchestration foundation. Implement one small plugin contract — an ItemSource, a few skills, a validator — and you instantly get orchestration, agent sessions, observability, and review UI for free. No more rebuilding the same four layers of plumbing for every new batch domain.
+
+## How to start
+
+```bash
+uv sync
+```
+
+### 打开一个工作区（以 novel_digest 为例）
+
+```bash
+# 1. 安装 Agent 侧 skill 到 ~/.agents/skills（--dest 可换 agent CLI 的目录）
+uv run domains/novel_digest/install.py
+# 2. 把确定性 CLI 装上 PATH（任何目录可用）
+cd domains/novel_digest/noveltool && uv tool install -e . && cd -
+# 3. 编译前端 → web/dist
+cd web && pnpm install && pnpm build && cd -
+# 4. 复制 config.example.toml，把 workspace 指向你的书目录，然后启动
+cp config.example.toml my-loom.toml
+uv run server/main_server.py -c my-loom.toml   # http://127.0.0.1:8000
+```
+
+详见 `doc/plan/novel_digest_acceptance.md` §0.5。
+
