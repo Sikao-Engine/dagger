@@ -136,7 +136,7 @@ class StateStore:
    （`item_id` 由领域给，但底座只当字符串用，做文件名安全化）。
    → 彻底消除 P3 的 `<sfx>` 撞名。
 2. **人可读性不靠路径**。想按名字找东西，查 `index.json`，或用
-   `dagger state ls --node review --shard b`。
+   `divdag state ls --node review --shard b`。
 3. **路径生成函数是纯函数且被单测钉死**：布局若要变更，只改 `StateStore._layout()` 一处，
    配合 `schema_version` 提升 + 迁移脚本。
 
@@ -181,7 +181,7 @@ class StateStore:
 
 - **前端与 controller 只通过 index 定位文件**，不再出现
   `Path(temp)/f"branch_dance_{suffix}"` 这种反向拼接（P1/P5 根治）。
-- index 是**缓存**，不是真相：`dagger state reindex` 扫描目录树 + 读 `_meta.json` 完全重建。
+- index 是**缓存**，不是真相：`divdag state reindex` 扫描目录树 + 读 `_meta.json` 完全重建。
 - 大 run（万级 item）时 index 拆为 `index/entries-*.jsonl` 分片，接口不变。
 
 ### 6.3 `journal.jsonl`
@@ -252,7 +252,7 @@ def _v1_to_v2(body: dict) -> dict:
 ```
 
 - 读取时按 `kind` + `schema_version` 自动升级到当前版本（**升级只在内存，不回写**，
-  除非显式 `dagger state migrate --write`）。
+  除非显式 `divdag state migrate --write`）。
 - `kind` 注册表同时给出 **JSON Schema**，用于：
   1. 写入时校验（Agent 写错立刻 reject 并给出可读错误，进入重试 prompt）；
   2. 前端自动生成只读表格视图（未知 kind 也能渲染）；
@@ -305,9 +305,9 @@ prompt 收缩为一句：
 Agent 被允许的写入只有三处，且**推荐一律经过确定性 CLI**：
 
 ```bash
-dagger state result  --write  <json|-@file>     # → contract/.../result.json（自动包信封、校验 schema）
-dagger state artifact --item ch_0413 --slot summary --file out.md
-dagger state scratch  --path checkpoint.json    # 只是返回一个安全路径，供 skill 自由写
+divdag state result  --write  <json|-@file>     # → contract/.../result.json（自动包信封、校验 schema）
+divdag state artifact --item ch_0413 --slot summary --file out.md
+divdag state scratch  --path checkpoint.json    # 只是返回一个安全路径，供 skill 自由写
 ```
 
 CLI 语义化退出码:0 成功 / 1 拒绝 / 2 需人工 / 3 参数错，
@@ -330,12 +330,12 @@ CLI 语义化退出码:0 成功 / 1 拒绝 / 2 需人工 / 3 参数错，
 | `artifact` | 永久；可 `--archive` 转冷存（打包 + 只留 index 条目 + 校验和） | 手动 / 定时 |
 
 ```bash
-dagger state gc  --run <id> --layers scratch,log --dry-run
-dagger state archive --run <id> --out run_2026_0807_a.daggerarc   # tar.zst + manifest + 校验
-dagger state verify --run <id>                                   # 校验 sha256 与 index 一致
+divdag state gc  --run <id> --layers scratch,log --dry-run
+divdag state archive --run <id> --out run_2026_0807_a.divdagarc   # tar.zst + manifest + 校验
+divdag state verify --run <id>                                   # 校验 sha256 与 index 一致
 ```
 
-`.daggerarc` 归档包 = `state/` 全量 + `run.json` + `index.json` + 校验清单，
+`.divdagarc` 归档包 = `state/` 全量 + `run.json` + `index.json` + 校验清单，
 **离线解开即可用只读模式在前端加载审查**（
 
 ---
@@ -347,7 +347,7 @@ dagger state verify --run <id>                                   # 校验 sha256
 1. **state 内部记录的路径一律相对 `state/`**（`index.json` / `_meta.json` / `result.json` 内的引用）。
 2. **DB 中存 `run_id` + 相对 key**，不存绝对路径。
 3. **绝对路径只在两个瞬间存在**：① `StateStore.path()` 返回值；② 渲染 TaskCard 时。
-4. 跨机器搬迁：`dagger state relocate --run <id> --root <new_path>` 只改 `run.json.root`
+4. 跨机器搬迁：`divdag state relocate --run <id> --root <new_path>` 只改 `run.json.root`
    与外部现场引用（workspace 路径），state 内部无需改写。
 
 ---
@@ -363,7 +363,7 @@ dagger state verify --run <id>                                   # 校验 sha256
 | 对话轨迹 | `state/log/*/transcript.jsonl` | DB 只存索引 |
 
 原则：**文件系统是业务真相，DB 是编排真相与索引。**
-两者不一致时的收敛方向由 `dagger state reconcile` 明确规定：
+两者不一致时的收敛方向由 `divdag state reconcile` 明确规定：
 
 ```
 DB 说 success 但 contract 缺 result.json      → 降级为 needs_review，报告不一致
@@ -391,11 +391,11 @@ for a in store.list(layer=Layer.ARTIFACT, item_id="ch_0413"): ...
 ### CLI（Agent + 人共用）
 
 ```
-dagger state ls        [--layer] [--node] [--item] [--kind]
-dagger state cat       <key-expr>
-dagger state result    --write / --check
-dagger state artifact  --item <id> --slot <s> --file <f>
-dagger state reindex | verify | gc | archive | relocate | reconcile | migrate
+divdag state ls        [--layer] [--node] [--item] [--kind]
+divdag state cat       <key-expr>
+divdag state result    --write / --check
+divdag state artifact  --item <id> --slot <s> --file <f>
+divdag state reindex | verify | gc | archive | relocate | reconcile | migrate
 ```
 
 ### HTTP（前端）
@@ -416,7 +416,7 @@ POST /api/v1/runs/{run_id}/state/gc                    # 需确认参数
 
 ## 13. 失效模式对照表
 
-| 失效场景 | `../temp` 现状 | Dagger StateStore |
+| 失效场景 | `../temp` 现状 | DivDag StateStore |
 |---------|---------------|----------------|
 | 编排读到写一半的结果 | 轮询 + 解析失败重试兜底 | `os.replace` 原子写，结构上不可能 |
 | 两个节点串味 checkpoint | 靠往目录名塞 task_id 打补丁 | 目录按 `node_run_id`/`attempt` 天然隔离 |
@@ -426,6 +426,6 @@ POST /api/v1/runs/{run_id}/state/gc                    # 需确认参数
 | 磁盘吃紧 | 只能整体清 temp（连证据一起没） | 按层 GC，contract/artifact 受保护 |
 | 新增一个 skill 要存中间态 | 自己拼一个 `temp/xxx_state/` | 声明 slot + 用 `store.open_scratch()` |
 | 前端要展示新产物 | 后端加 controller 拼路径 + 前端加 fetch | 写进 `ArtifactSpec` 即自动出现在审查界面 |
-| 离线拿到归档包 | 一堆无上下文文件 | `.daggerarc` 自解释，可只读加载 |
+| 离线拿到归档包 | 一堆无上下文文件 | `.divdagarc` 自解释，可只读加载 |
 | 布局需要调整 | 改 6+ 处拼接 + 前端 + 迁移脚本 | 改 `StateStore._layout()` + bump `layout_version` |
 

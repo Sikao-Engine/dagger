@@ -18,7 +18,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dagger_kernel.state.schema import SCHEMA_REGISTRY
+from divdag_kernel.state.schema import SCHEMA_REGISTRY
 
 NOVEL_CHAPTER = "novel_chapter"
 NOVEL_VOLUME_SUMMARY = "novel_volume_summary"

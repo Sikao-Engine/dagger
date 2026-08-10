@@ -21,13 +21,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from dagger_cli.scaffold import (
+from divdag_cli.scaffold import (
     EXIT_NEEDS_HUMAN,
     EXIT_NEEDS_REVIEW,
     EXIT_OK,
     EXIT_PARAM_ERROR,
 )
-from dagger_kernel.state.schema import validate as validate_schema
+from divdag_kernel.state.schema import validate as validate_schema
 
 from ..items import chapter_seq
 from ..schemas import NOVEL_CHAPTER

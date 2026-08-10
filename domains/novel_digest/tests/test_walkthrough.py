@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from dagger_kernel.dag import NodeRegistry
-from dagger_kernel.dag.instantiator import ShardPlan, instantiate
-from dagger_kernel.engine import run_graph
-from dagger_kernel.executors import ExecutorCatalog
-from dagger_kernel.spi import DomainRegistry
-from dagger_kernel.state import K, StateStore
+from divdag_kernel.dag import NodeRegistry
+from divdag_kernel.dag.instantiator import ShardPlan, instantiate
+from divdag_kernel.engine import run_graph
+from divdag_kernel.executors import ExecutorCatalog
+from divdag_kernel.spi import DomainRegistry
+from divdag_kernel.state import K, StateStore
 from novel_digest.plugin import NovelPlugin
 from novel_digest.testing import make_book
 

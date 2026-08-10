@@ -1,10 +1,10 @@
 [project]
 name = "noveltool"
 version = "0.1.0"
-description = "Deterministic CLI for the Dagger novel_digest domain (status/next/fill/check)."
+description = "Deterministic CLI for the DivDag novel_digest domain (status/next/fill/check)."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["dagger-domain-novel-digest"]
+dependencies = ["divdag-domain-novel-digest"]
 
 [project.scripts]
 noveltool = "novel_digest.noveltool.cli:main"
@@ -14,13 +14,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 # Pure packaging shim: no importable code of its own. The console script is
-# provided by the `dagger-domain-novel-digest` dependency below.
+# provided by the `divdag-domain-novel-digest` dependency below.
 [tool.hatch.build.targets.wheel]
 bypass-selection = true
 
-# Resolve the domain package (and its dagger_* deps) from this repo checkout so
+# Resolve the domain package (and its divdag_* deps) from this repo checkout so
 # `uv tool install -e .` works standalone, outside the uv workspace.
 [tool.uv.sources]
-dagger-domain-novel-digest = { path = "../", editable = true }
-dagger_kernel = { path = "../../../packages/dagger_kernel" }
-dagger_cli = { path = "../../../packages/dagger_cli" }
+divdag-domain-novel-digest = { path = "../", editable = true }
+divdag_kernel = { path = "../../../packages/divdag_kernel" }
+divdag_cli = { path = "../../../packages/divdag_cli" }

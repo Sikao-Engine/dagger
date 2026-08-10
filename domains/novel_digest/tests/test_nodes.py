@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 import pytest
-from dagger_kernel.dag import NodeContext
-from dagger_kernel.dag.nodes import ContractError
+from divdag_kernel.dag import NodeContext
+from divdag_kernel.dag.nodes import ContractError
 from novel_digest.nodes.entity_merge import EntityMergeNode, merge_entities
 from novel_digest.nodes.timeline_merge import TimelineMergeNode, accumulate_timeline
 from novel_digest.testing import make_chapter_product, write_product

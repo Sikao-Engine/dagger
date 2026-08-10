@@ -17,8 +17,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dagger_kernel.dag import ContextPatch, NodeContext
-from dagger_kernel.dag.nodes import ContractError, NodeContract
+from divdag_kernel.dag import ContextPatch, NodeContext
+from divdag_kernel.dag.nodes import ContractError, NodeContract
 
 
 def merge_entities(chapters: list[dict[str, Any]]) -> list[dict[str, Any]]:

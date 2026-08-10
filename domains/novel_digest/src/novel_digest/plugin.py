@@ -16,13 +16,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dagger_kernel.dag import DagTemplate, NodeContext, NodeRegistry
-from dagger_kernel.executors import ExecutorSpec
-from dagger_kernel.planning import Milestone, WorkItem
-from dagger_kernel.planning.sharder import ShardPlan, weighted
-from dagger_kernel.review import IntentDiffProvider, Scanner
-from dagger_kernel.spi import ReferenceSpec, SkillSpec
-from dagger_kernel.state.artifact_spec import ArtifactSpec, Slot
+from divdag_kernel.dag import DagTemplate, NodeContext, NodeRegistry
+from divdag_kernel.executors import ExecutorSpec
+from divdag_kernel.planning import Milestone, WorkItem
+from divdag_kernel.planning.sharder import ShardPlan, weighted
+from divdag_kernel.review import IntentDiffProvider, Scanner
+from divdag_kernel.spi import ReferenceSpec, SkillSpec
+from divdag_kernel.state.artifact_spec import ArtifactSpec, Slot
 
 from .executors import EXECUTORS
 from .items import ChapterSource, chapter_seq

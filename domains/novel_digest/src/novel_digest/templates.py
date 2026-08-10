@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dagger_kernel.dag import DagTemplate, EdgeDef, EdgeKind, NodeDef, Scope
+from divdag_kernel.dag import DagTemplate, EdgeDef, EdgeKind, NodeDef, Scope
 
 TEMPLATE_ID = "novel_digest_default"
 DOMAIN_ID = "novel_digest"

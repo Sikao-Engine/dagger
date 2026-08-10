@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 from jinja2 import Environment
-from dagger_kernel.spi import SkillSpec
+from divdag_kernel.spi import SkillSpec
 
 NOVEL_DIGEST = SkillSpec(
     key="novel-digest",

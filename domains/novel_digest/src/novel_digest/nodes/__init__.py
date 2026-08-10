@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dagger_kernel.dag import NodeRegistry
+from divdag_kernel.dag import NodeRegistry
 
 from .entity_merge import EntityMergeNode
 from .timeline_merge import TimelineMergeNode

@@ -1,12 +1,12 @@
 [project]
-name = "dagger-domain-tiny"
+name = "divdag-domain-tiny"
 version = "0.1.0"
-description = "Tiny demo domain for Dagger: local file batch summarization"
+description = "Tiny demo domain for DivDag: local file batch summarization"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["dagger_kernel"]
+dependencies = ["divdag_kernel"]
 
-[project.entry-points."dagger.domains"]
+[project.entry-points."divdag.domains"]
 tiny = "tiny.plugin:plugin"
 
 [build-system]

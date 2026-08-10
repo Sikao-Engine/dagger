@@ -3,7 +3,7 @@
 > 配套文档：[通用批量 Agent 编排底座架构设计](./universal_base_architecture.md)
 >
 > 本文回答一个问题：**手上有一批重复但需要语义判断的工作，如何在 30 分钟内把它变成一个
-> 可监控、可续跑、可审查的 Dagger 领域插件。**
+> 可监控、可续跑、可审查的 DivDag 领域插件。**
 
 ---
 
@@ -26,14 +26,14 @@
 ## 1. 五步建插件
 
 ```bash
-dagger create-domain novel_digest
+divdag create-domain novel_digest
 ```
 
 脚手架生成：
 
 ```
 domains/novel_digest/
-├── pyproject.toml          # entry_points: dagger.domains = novel_digest = ...:plugin
+├── pyproject.toml          # entry_points: divdag.domains = novel_digest = ...:plugin
 ├── plugin.py               # DomainPlugin 实现（唯一入口）
 ├── items.py                # ItemSource
 ├── executors.py            # ExecutorSpec 列表
@@ -133,7 +133,7 @@ NOVEL_DIGEST = SkillSpec(
 
 **这是 CubeClaw 最重要的经验之一**：把能写死的逻辑从 LLM 手里拿走。
 
-`dagger_cli.scaffold` 提供脚手架，你的 CLI 只需满足三条契约：
+`divdag_cli.scaffold` 提供脚手架，你的 CLI 只需满足三条契约：
 
 ```
 1. 所有输出为 JSON（`--json` 默认开启）
@@ -267,11 +267,11 @@ CubeClaw 的 `netease-impact-preview` 就是这个模式。
 
 ```python
 # domains/tiny/plugin.py
-from dagger_kernel.spi import DomainPlugin
-from dagger_kernel.executors import ExecutorSpec, Scope
-from dagger_kernel.dag import DagTemplate, NodeDef, EdgeDef, EdgeKind
-from dagger_kernel.contract import SkillSpec
-from dagger_kernel.planning import WorkItem, ItemLedgerSnapshot
+from divdag_kernel.spi import DomainPlugin
+from divdag_kernel.executors import ExecutorSpec, Scope
+from divdag_kernel.dag import DagTemplate, NodeDef, EdgeDef, EdgeKind
+from divdag_kernel.contract import SkillSpec
+from divdag_kernel.planning import WorkItem, ItemLedgerSnapshot
 
 class TinySource:
     async def refresh(self, ws):

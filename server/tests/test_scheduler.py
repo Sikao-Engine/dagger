@@ -12,22 +12,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dagger_server.database import (
+from divdag_server.database import (
     create_all,
     make_engine,
     make_session_factory,
     sqlite_url,
 )
-from dagger_server.domain_runtime import assemble_runtime
-from dagger_server.events import EventBus
-from dagger_server.repositories import (
+from divdag_server.domain_runtime import assemble_runtime
+from divdag_server.events import EventBus
+from divdag_server.repositories import (
     assert_no_absolute_paths,
     list_attempts,
     list_events,
     list_node_runs,
     list_shards,
 )
-from dagger_server.scheduler import Scheduler, ScheduleRequest
+from divdag_server.scheduler import Scheduler, ScheduleRequest
 
 
 def _make_items(root: Path) -> Path:
@@ -98,7 +98,7 @@ def test_scheduler_runs_tiny_end_to_end(tmp_path: Path) -> None:
     assert violations == [], violations
 
     # StateStore tree verifies clean.
-    from dagger_kernel.state import StateStore
+    from divdag_kernel.state import StateStore
 
     store = StateStore(scheduler.data_dir / "run_test", run_id="run_test")
     assert store.verify() == []
@@ -134,7 +134,7 @@ def test_scheduler_reuses_engine_readiness(tmp_path: Path) -> None:
     We assert by structure: the scheduler's only graph-execution call is
     run_graph (verified by patching it to count invocations).
     """
-    import dagger_server.scheduler as sched_mod
+    import divdag_server.scheduler as sched_mod
 
     items = _make_items(tmp_path / "items")
     scheduler, factory, _, _ = _build_scheduler(tmp_path)

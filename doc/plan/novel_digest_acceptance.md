@@ -1,6 +1,6 @@
 # 长篇小说分析任务验收指南
 
-> 目标读者：第一次把 Dagger 用于真实长篇任务（几千章原文 → 逐章摘要 + 实体 + 全局时间线 + 一致性报告）的工程师。
+> 目标读者：第一次把 DivDag 用于真实长篇任务（几千章原文 → 逐章摘要 + 实体 + 全局时间线 + 一致性报告）的工程师。
 >
 > 本文不手把手写完 `novel_digest` 插件；它给你一张地图 + 每一站的验收判据，让你在实际工作中按里程碑推进、按判据收口。设计基线在 `doc/design/universal_base_architecture.md` §14 和 `doc/design/domain_plugin_cookbook.md`，本文是它们在落地维度的展开。
 >
@@ -29,7 +29,7 @@
 
 ## 0.5 环境安装（一次性，与工作区解耦）
 
-以下四步把 Dagger 从「仓库里的代码」变成「可打开任意工作区的部署」。**所有里程碑都在你自己的工作区里验收**——一个含 `chapters/*.txt` 的书目录，不再依赖仓库路径。四步的命令只需在仓库里执行一次。
+以下四步把 DivDag 从「仓库里的代码」变成「可打开任意工作区的部署」。**所有里程碑都在你自己的工作区里验收**——一个含 `chapters/*.txt` 的书目录，不再依赖仓库路径。四步的命令只需在仓库里执行一次。
 
 ### Step 1 — 安装 Agent 侧 skill
 
@@ -64,16 +64,16 @@ cd web && pnpm install && pnpm build
 ### Step 4 — 配置并在指定工作区启动 server
 
 ```bash
-cp config.example.toml my-dagger.toml   # 放哪都行；相对路径相对配置文件解析
-# 编辑：workspace = 你的书目录；web_dist = web/dist（相对 my-dagger.toml 或绝对路径）
-uv run server/main_server.py -c my-dagger.toml
+cp config.example.toml my-divdag.toml   # 放哪都行；相对路径相对配置文件解析
+# 编辑：workspace = 你的书目录；web_dist = web/dist（相对 my-divdag.toml 或绝对路径）
+uv run server/main_server.py -c my-divdag.toml
 ```
 
-server 在 `workspace` 下创建 `.dagger/`（state 树）与 `dagger.db`，在 `http://127.0.0.1:8000` 托管 UI + REST + SSE。仓库里只保留 `config.example.toml`，真实配置不入库。
+server 在 `workspace` 下创建 `.divdag/`（state 树）与 `divdag.db`，在 `http://127.0.0.1:8000` 托管 UI + REST + SSE。仓库里只保留 `config.example.toml`，真实配置不入库。
 
 **验收**：`curl http://127.0.0.1:8000/api/v1/domains` 返回含 `novel_digest`；浏览器打开 `/` 看到前端；`/runs/<任意id>` 深链返回 SPA 页面；`curl /api/v1/nope` 返回 JSON 404。
 
-> 不带 `-c` 时退回旧行为：当前目录为工作区（`./dagger.db` + `./.dagger`），`DAGGER_DB_URL` / `DAGGER_DATA_DIR` / `DAGGER_HOST` / `DAGGER_PORT` 环境变量仍有效；`python -m dagger_server -c <config>` 等价。
+> 不带 `-c` 时退回旧行为：当前目录为工作区（`./divdag.db` + `./.divdag`），`DIVDAG_DB_URL` / `DIVDAG_DATA_DIR` / `DIVDAG_HOST` / `DIVDAG_PORT` 环境变量仍有效；`python -m divdag_server -c <config>` 等价。
 
 ---
 
@@ -91,7 +91,7 @@ server 在 `workspace` 下创建 `.dagger/`（state 树）与 `dagger.db`，在 
 **验收判据**：
 - [ ] 任意一章手写一个完整 `chapter.json` 能通过 schema 校验（用内核 `SCHEMA_REGISTRY.register`）
 - [ ] 任意一份缺字段的 `chapter.json` 被拒绝并给出字段级错误
-- [ ] schema 文件进 `doc/contracts/` 自动生成流程（`dagger_check contracts` 触发后产物与提交一致）
+- [ ] schema 文件进 `doc/contracts/` 自动生成流程（`divdag_check contracts` 触发后产物与提交一致）
 
 **反模式自查**：不要在 prompt 里内联 schema 文本——token 浪费 + 易截断；写 `*.meta.json`，prompt 只给路径。
 
@@ -132,7 +132,7 @@ server 在 `workspace` 下创建 `.dagger/`（state 树）与 `dagger.db`，在 
 
 ### Step 4 — 确定性 CLI（noveltool）
 
-**做什么**：用 `dagger_cli.scaffold` 脚手架生成 `noveltool`，照 cookbook §1 Step 4 实现四条命令。
+**做什么**：用 `divdag_cli.scaffold` 脚手架生成 `noveltool`，照 cookbook §1 Step 4 实现四条命令。
 
 **契约三条**：
 1. 所有输出为 JSON（`--json` 默认开启）
@@ -214,11 +214,11 @@ def artifact_spec(self) -> ArtifactSpec:
 4. scheduler mock `_seed_mock_artifacts` 会按声明的 spec 种子化产物 → EvidenceViewer 有东西可看
 
 **验收判据**：
-- [ ] `uv run dagger run --domain novel_digest --items <workspace> --shards 1 --backend mock` 跑完无错（或按 §0.5 Step 4 起 server 后在 UI 创建 mock run）
+- [ ] `uv run divdag run --domain novel_digest --items <workspace> --shards 1 --backend mock` 跑完无错（或按 §0.5 Step 4 起 server 后在 UI 创建 mock run）
 - [ ] state 树结构符合 §14.3：`control/items/<id>.json` + `contract/<node_run_id>/attempt-1/result.json` + `artifact/items/<id>/summary.json`
-- [ ] `uv run dagger state ls --layer artifact` 看到种子的 slot
+- [ ] `uv run divdag state ls --layer artifact` 看到种子的 slot
 - [ ] `/runs/:id/items/:id/evidence` 页面能展示 `summary` markdown slot（server 已按 §0.5 Step 4 打开 `<workspace>`）
-- [ ] `uv run dagger state archive` 出的 `.daggerarc` 能被只读加载逐项查看
+- [ ] `uv run divdag state archive` 出的 `.divdagarc` 能被只读加载逐项查看
 
 ### M-B：单章真实 LLM
 
@@ -230,7 +230,7 @@ def artifact_spec(self) -> ArtifactSpec:
 3. 看 Attempt 视图回放 transcript，确认 Agent 行为符合 prompt
 
 **验收判据**：
-- [ ] `uv run dagger run --domain novel_digest --items <workspace> --backend opencode-http` 单章跑通
+- [ ] `uv run divdag run --domain novel_digest --items <workspace> --backend opencode-http` 单章跑通
 - [ ] 单节点手工跑通过一次（不经 DAG）：`noveltool next --root <workspace> --out <shard_out_dir>` 直接跑，确认 prompt 与 CLI 配合无误
 - [ ] Attempt 流仅凭 SSE 可重建 transcript（不依赖后端日志）
 - [ ] 中途 kill 进程后重跑，能从 `cursor.json` 正确续上
@@ -281,7 +281,7 @@ def artifact_spec(self) -> ArtifactSpec:
 - [ ] 磁盘预算不打爆（如启用 `ResourceBudget` Hook，预警触发）
 - [ ] Blocked 时的通知渠道通了
 - [ ] `can_run: false` 部署下，前端可正常查看历史 Run + EvidenceViewer 全程可用
-- [ ] 全程 state 树通过 `uv run dagger state verify`（sha256 对账）无 corruption
+- [ ] 全程 state 树通过 `uv run divdag state verify`（sha256 对账）无 corruption
 
 ---
 
@@ -319,19 +319,19 @@ def artifact_spec(self) -> ArtifactSpec:
 
 ## 4. 抽象回归记录（T8.2）
 
-本任务是 Dagger 第二领域（M8），是抽象质量的度量。每当你**被迫修改内核**才能让 `novel_digest` 跑通，按这个表记录一次，作为 SPI 漏洞的反馈：
+本任务是 DivDag 第二领域（M8），是抽象质量的度量。每当你**被迫修改内核**才能让 `novel_digest` 跑通，按这个表记录一次，作为 SPI 漏洞的反馈：
 
 | 日期 | 修改的内核文件 | 修改原因 | 是否回写为新 SPI | 反馈去向 |
 |------|---------------|---------|-----------------|---------|
-| _示例_ | `dagger_kernel/dag/instantiator.py` | novel_digest 需要"动态分片"（先扫一遍才能决定片数） | 是 → `Scope.SHARD_DYNAMIC` + `__shards__` 已实现 | 设计 §11.3 已记 |
-| 2026-08-08 (K1) | `dagger_kernel/dag/instantiator.py` | §14.2 模板的 `consistency → final_report` 是 run 级 INTRA 边，照抄即实例化报错 | 是 → INTRA 支持两端同为 RUN/RUN_ENTRY（运行级顺序边）；SHARD↔RUN 混用仍抛错 | 冒烟报告 §3；`tests/dag/test_instantiator.py` 钉死 |
-| 2026-08-08 (K2) | `dagger_kernel/dag/nodes/ensure_workspace.py`（新）+ `dagger_kernel/spi.py` | §14.2 模板含两个 `ensure_workspace` 节点，内核无此内建执行器 | 是 → 内核内建节点（local-dir 最小语义，root/shard 两 variant）+ `KERNEL_EXECUTORS`/`register_kernel_nodes`，`contribute_to` 先内建后领域 | 设计 §6 已有其名；WorkspaceProvider 全 SPI 留后续项 |
-| 2026-08-08 (K3) | `dagger_kernel/engine.py` + `dagger_kernel/spi.py` | agent 节点的结果合同（outputs ⊆ SkillSpec.produces）与 `ResultValidator` SPI 没有任何一层真正执行 | 是 → `run_graph` 新增 `skills`/`validators` 入参，违规/校验失败走重试路径；`ResultValidator` 协议补可选 `context`（含 shard 视图） | server 调度路径接线留后续项（冒烟报告 §6） |
-| 2026-08-08 (K4) | `dagger_kernel/engine.py::_resolve_context` | SkillSpec 模板引用 `{{ shard.item_count }}` / `{{ shard.last_item.id }}`，内核上下文给不出这些值 | 是 → shard 视图充实（item_count/items/first_item/last_item）+ shard_seed 补 item_count | `tests/test_engine.py::TestShardViewEnrichment` 钉死 |
-| 2026-08-08 (K5) | `dagger_kernel/review.py`（新）+ `dagger_kernel/spi.py` | Step 5 需要 Scanner/IntentDiff SPI；`scanners: list[Any]` 是无类型占位，无 `intent_diff()` 钩子 | 是 → `Finding`/`ScanContext`/`Scanner`/`IntentDiffProvider` + `DomainPlugin.intent_diff()`/`mock_outputs()` 钩子，`scanners` 收紧为 `list[Scanner]` | T7.2 的落地起点；`tests/test_review.py` 钉死 |
-| 2026-08-08 (K8) | `dagger_kernel/engine.py::_propagate` | 上下文创播按 target scope 广播到全部分片，与 INTRA（本片）/SERIAL_PREV（下一片）语义矛盾：分片异值 key 必误报 ContextConflictError（设计 §4.1「上下文沿边流动」的实现缺陷） | 缺陷修复（语义校正）→ 按 edge kind 定向投递：INTRA 同片、SERIAL_PREV 下一片、LAST 仅末片、ALL 汇聚单实例 | `tests/test_engine.py::TestEdgeAwarePropagation` 钉死 |
-| 2026-08-08 (K6) | `packages/dagger_cli/src/dagger_cli/main.py`（宿主，非内核） | mock 路径 tiny 专用且带 bug（domains_dir 层级、本地加载特判 tiny、不传 skills/validators、`reg.templates()` 误调用、`die()` 不退出） | 宿主修复 → mock dispatcher 通用化（优先 `mock_outputs` 钩子，否则按 produces+success_key 合成）；本地域按「目录名=包名」泛化加载；修正 `parents[4]` | CLI 测试 `packages/dagger_cli/tests/` 钉死 |
-| 2026-08-08 (K7) | `scripts/dagger_check.py`（宿主，非内核） | `dagger_check contracts` 只 dump 内核 schema，领域 kind 不进合同文档 | 宿主修复 → best-effort 导入 `<domain>.schemas` 后再生成 | 产物 `doc/contracts/state_objects.md` 含三个 `novel_*` kind，二次执行 diff 为空 |
+| _示例_ | `divdag_kernel/dag/instantiator.py` | novel_digest 需要"动态分片"（先扫一遍才能决定片数） | 是 → `Scope.SHARD_DYNAMIC` + `__shards__` 已实现 | 设计 §11.3 已记 |
+| 2026-08-08 (K1) | `divdag_kernel/dag/instantiator.py` | §14.2 模板的 `consistency → final_report` 是 run 级 INTRA 边，照抄即实例化报错 | 是 → INTRA 支持两端同为 RUN/RUN_ENTRY（运行级顺序边）；SHARD↔RUN 混用仍抛错 | 冒烟报告 §3；`tests/dag/test_instantiator.py` 钉死 |
+| 2026-08-08 (K2) | `divdag_kernel/dag/nodes/ensure_workspace.py`（新）+ `divdag_kernel/spi.py` | §14.2 模板含两个 `ensure_workspace` 节点，内核无此内建执行器 | 是 → 内核内建节点（local-dir 最小语义，root/shard 两 variant）+ `KERNEL_EXECUTORS`/`register_kernel_nodes`，`contribute_to` 先内建后领域 | 设计 §6 已有其名；WorkspaceProvider 全 SPI 留后续项 |
+| 2026-08-08 (K3) | `divdag_kernel/engine.py` + `divdag_kernel/spi.py` | agent 节点的结果合同（outputs ⊆ SkillSpec.produces）与 `ResultValidator` SPI 没有任何一层真正执行 | 是 → `run_graph` 新增 `skills`/`validators` 入参，违规/校验失败走重试路径；`ResultValidator` 协议补可选 `context`（含 shard 视图） | server 调度路径接线留后续项（冒烟报告 §6） |
+| 2026-08-08 (K4) | `divdag_kernel/engine.py::_resolve_context` | SkillSpec 模板引用 `{{ shard.item_count }}` / `{{ shard.last_item.id }}`，内核上下文给不出这些值 | 是 → shard 视图充实（item_count/items/first_item/last_item）+ shard_seed 补 item_count | `tests/test_engine.py::TestShardViewEnrichment` 钉死 |
+| 2026-08-08 (K5) | `divdag_kernel/review.py`（新）+ `divdag_kernel/spi.py` | Step 5 需要 Scanner/IntentDiff SPI；`scanners: list[Any]` 是无类型占位，无 `intent_diff()` 钩子 | 是 → `Finding`/`ScanContext`/`Scanner`/`IntentDiffProvider` + `DomainPlugin.intent_diff()`/`mock_outputs()` 钩子，`scanners` 收紧为 `list[Scanner]` | T7.2 的落地起点；`tests/test_review.py` 钉死 |
+| 2026-08-08 (K8) | `divdag_kernel/engine.py::_propagate` | 上下文创播按 target scope 广播到全部分片，与 INTRA（本片）/SERIAL_PREV（下一片）语义矛盾：分片异值 key 必误报 ContextConflictError（设计 §4.1「上下文沿边流动」的实现缺陷） | 缺陷修复（语义校正）→ 按 edge kind 定向投递：INTRA 同片、SERIAL_PREV 下一片、LAST 仅末片、ALL 汇聚单实例 | `tests/test_engine.py::TestEdgeAwarePropagation` 钉死 |
+| 2026-08-08 (K6) | `packages/divdag_cli/src/divdag_cli/main.py`（宿主，非内核） | mock 路径 tiny 专用且带 bug（domains_dir 层级、本地加载特判 tiny、不传 skills/validators、`reg.templates()` 误调用、`die()` 不退出） | 宿主修复 → mock dispatcher 通用化（优先 `mock_outputs` 钩子，否则按 produces+success_key 合成）；本地域按「目录名=包名」泛化加载；修正 `parents[4]` | CLI 测试 `packages/divdag_cli/tests/` 钉死 |
+| 2026-08-08 (K7) | `scripts/divdag_check.py`（宿主，非内核） | `divdag_check contracts` 只 dump 内核 schema，领域 kind 不进合同文档 | 宿主修复 → best-effort 导入 `<domain>.schemas` 后再生成 | 产物 `doc/contracts/state_objects.md` 含三个 `novel_*` kind，二次执行 diff 为空 |
 
 **回归判据**：
 - 若内核零改动即可跑通 M-D → 抽象成功，可继续。
@@ -360,7 +360,7 @@ def artifact_spec(self) -> ArtifactSpec:
 
 ```
 domains/novel_digest/
-├── pyproject.toml          # entry_points: dagger.domains = novel_digest = ...:plugin
+├── pyproject.toml          # entry_points: divdag.domains = novel_digest = ...:plugin
 ├── README.md               # 任务画像 + 拓扑说明
 ├── install.py              # §0.5 Step 1：把 skills_md/ 装进 ~/.agents/skills（--dest/--dry-run）
 ├── skills_md/              # Agent 侧 SKILL.md 源文件（四个，对应 SkillSpec 的 /xxx 指令）
@@ -384,9 +384,9 @@ domains/novel_digest/
 server 侧新增（§0.5 Step 4）：
 ```
 config.example.toml         # 仓库根：唯一入库的配置样例；真实配置放仓库外
-server/main_server.py       # uv run server/main_server.py -c <config>（等价 python -m dagger_server）
-server/src/dagger_server/
-├── config.py               # DaggerConfig + load_config：TOML 加载，相对路径相对配置文件解析
+server/main_server.py       # uv run server/main_server.py -c <config>（等价 python -m divdag_server）
+server/src/divdag_server/
+├── config.py               # DivDagConfig + load_config：TOML 加载，相对路径相对配置文件解析
 └── app.py                  # create_app(..., web_dist=...)：静态托管 web/dist + SPA fallback
 ```
 
@@ -420,7 +420,7 @@ def web_manifest(self) -> dict[str, Any]:
 | `StateStore` 五层 | ✅ M1 | 章节产物入 `artifact/items/<id>/`，全局产物入 `artifact/run/<slot>` |
 | DAG 引擎 + SERIAL_PREV/ALL | ✅ M2 | 时间线串行 + 一致性汇聚直接用 |
 | `AgentBackend` Protocol | ✅ M3 | mock 跑 M-A，opencode-http 跑 M-B+ |
-| CLI walking skeleton | ✅ M4 | `uv run dagger run --domain novel_digest` 即可 |
+| CLI walking skeleton | ✅ M4 | `uv run divdag run --domain novel_digest` 即可 |
 | server (REST + SSE + 调度) | ✅ M5 | 前端画布 / Attempt / State / Ledger / Planner 全套可用 |
 | 前端底座 | ✅ M6 | DAGCanvas / RunDetail / Attempt / StateBrowser / Ledger / Planner 全套 |
 | `ArtifactSpec` + REST + EvidenceViewer | ✅ M7 T7.1 + T6.9 | `artifact_spec()` 声明五 slot，EvidenceViewer 零前端改动展示 |
@@ -454,13 +454,13 @@ def web_manifest(self) -> dict[str, Any]:
 
 | 症状 | 先查 | 再查 |
 |------|------|------|
-| `dagger run` 报 SPI 错 | `plugin.py` 的 entry point 是否注册成功（`uv run dagger domains` 列表） | `DomainPlugin` 必需方法是否齐全 |
+| `divdag run` 报 SPI 错 | `plugin.py` 的 entry point 是否注册成功（`uv run divdag domains` 列表） | `DomainPlugin` 必需方法是否齐全 |
 | Agent 跑完但 `digest_ok` 不 true | SkillSpec 的 `success_key` 与 `session_result.outputs` 字段名是否一致 | `noveltool status` 的退出码 |
 | 时间线倒流 | `timeline_merge` 节点的 `maps` 是否把 `prev_timeline_path` 映射进来 | `SERIAL_PREV` 边是否连对（画布上看串行顺序） |
 | EvidenceViewer 显示 undeclared slot | Agent 写的 slot 名与 `artifact_spec.slots` 的 `name` 是否一致 | `K.artifact_item(item_id, slot)` 的 slot 拼写 |
 | 重跑烧 token | 节点是否幂等跳过（看 DAG 画布节点状态） | `cursor.json` 的 `cursor_item_id` 是否更新 |
 | `consistency` 节点不 ready | `entity_merge` / `volume_summary` 是否全部 success | `ALL` 边是否连对 |
-| state 树 corruption | `uv run dagger state verify`（sha256 对账） | 是否绕过 `StateStore.path` 直接拼路径（T0.4 守卫会抓） |
+| state 树 corruption | `uv run divdag state verify`（sha256 对账） | 是否绕过 `StateStore.path` 直接拼路径（T0.4 守卫会抓） |
 
 ---
 
@@ -472,7 +472,7 @@ novel_digest 视为"生产可用"需同时满足：
 1. **M-E 全本跑通**：几千章真实原文，数小时到数天，中途 3+ 次人为中断均正确续上
 2. **§3 上线清单全勾**
 3. **EvidenceViewer 端到端可用**：任意一章可看到原文 vs 摘要 + 实体表 + 时间线 + 疑点，Scanner 发现项可见
-4. **`uv run dagger state archive` 出的 `.daggerarc` 能在 `can_run: false` 部署下只读加载逐项查看**
+4. **`uv run divdag state archive` 出的 `.divdagarc` 能在 `can_run: false` 部署下只读加载逐项查看**
 5. **前端 `/timeline` 页面可用**（领域自定义 route，走 `web_manifest` 注册）
 
-满足这六条，本任务可作为 Dagger 第二领域验收通过，抽象质量得到验证。同时为后续 `domains/code_batch`（CubeClaw 迁移）证明底座可承载真实生产负载。
+满足这六条，本任务可作为 DivDag 第二领域验收通过，抽象质量得到验证。同时为后续 `domains/code_batch`（CubeClaw 迁移）证明底座可承载真实生产负载。

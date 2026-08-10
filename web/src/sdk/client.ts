@@ -1,5 +1,5 @@
 /**
- * Typed API client. Wraps fetch against the Dagger backend (Litestar).
+ * Typed API client. Wraps fetch against the DivDag backend (Litestar).
  *
  * All paths are relative to `/api/v1` (see config.ts). Errors are normalized
  * into `ApiError` with a `detail` string pulled from Litestar's error body
@@ -179,7 +179,7 @@ export async function getItemArtifactBytes(
   const buf = await r.arrayBuffer()
   return {
     bytes: new Uint8Array(buf),
-    sha256: r.headers.get('X-Dagger-Sha256') ?? '',
+    sha256: r.headers.get('X-DivDag-Sha256') ?? '',
     size: Number(r.headers.get('Content-Length') ?? buf.byteLength),
   }
 }

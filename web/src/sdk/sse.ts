@@ -1,7 +1,7 @@
 /**
- * React hooks for Dagger's two SSE channels.
+ * React hooks for DivDag's two SSE channels.
  *
- * `useRunStream(runId)` — run-level DaggerEvents (node started/succeeded/failed,
+ * `useRunStream(runId)` — run-level DivDagEvents (node started/succeeded/failed,
  * run started/completed). Backed by `/api/v1/runs/{id}/events/stream`.
  *   1. REST snapshot via `getPipeline(runId)` (node states + counts)
  *   2. SSE live updates with `Last-Event-ID` resume

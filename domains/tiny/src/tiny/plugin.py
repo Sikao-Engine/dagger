@@ -7,7 +7,7 @@ Implements DomainPlugin SPI:
 - SkillSpec: tiny-work + tiny-report prompt templates.
 
 Plug-and-play: registering this entry point makes the tiny domain available to
-`dagger run --domain tiny` with zero kernel code changes.
+`divdag run --domain tiny` with zero kernel code changes.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from dagger_kernel.dag import (
+from divdag_kernel.dag import (
     ContextPatch,
     DagTemplate,
     EdgeDef,
@@ -24,11 +24,11 @@ from dagger_kernel.dag import (
     NodeRegistry,
     Scope,
 )
-from dagger_kernel.dag.nodes import NodeContract
-from dagger_kernel.executors import ExecutorSpec
-from dagger_kernel.planning import ItemLedgerSnapshot, WorkItem
-from dagger_kernel.spi import SkillSpec
-from dagger_kernel.state import ArtifactSpec, Slot
+from divdag_kernel.dag.nodes import NodeContract
+from divdag_kernel.executors import ExecutorSpec
+from divdag_kernel.planning import ItemLedgerSnapshot, WorkItem
+from divdag_kernel.spi import SkillSpec
+from divdag_kernel.state import ArtifactSpec, Slot
 
 TEMPLATE = DagTemplate(
     id="tiny_default",
@@ -171,7 +171,7 @@ class TinyPlugin:
         )
 
     def web_manifest(self) -> dict[str, Any]:
-        """Slots for the Dagger review UI + a domain page.
+        """Slots for the DivDag review UI + a domain page.
 
         `itemRowExtra` lets the tiny domain add a column to the ledger table
         without writing any generic front-end code — the column is rendered

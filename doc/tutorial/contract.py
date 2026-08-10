@@ -1,1 +1,1 @@
-`python -m dagger_check contracts`
+`python -m divdag_check contracts`

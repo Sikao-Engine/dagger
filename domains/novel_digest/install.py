@@ -36,7 +36,7 @@ Next steps (workspace-decoupled setup):
        cd web && pnpm install && pnpm build
 
   4. Copy `config.example.toml` to your own config, point `workspace` at the
-     book directory you want to work in, then start Dagger:
+     book directory you want to work in, then start DivDag:
        uv run server/main_server.py -c path/to/your.toml
 """
 

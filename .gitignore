@@ -37,15 +37,15 @@ web/.vite/
 .DS_Store
 Thumbs.db
 
-# Dagger runtime
-.dagger/
-*.daggerarc
+# DivDag runtime
+.divdag/
+*.divdagarc
 /state/
 /workspaces/
 
-# Dagger DB (default SQLite; tests/migrations produce these)
-dagger.db
-dagger.db-*
+# DivDag DB (default SQLite; tests/migrations produce these)
+divdag.db
+divdag.db-*
 *.sqlite
 *.sqlite-*
 

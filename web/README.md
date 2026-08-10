@@ -1,4 +1,4 @@
-# dagger web ui
+# divdag web ui
 
 - prepare `pnpm install`
 - build `pnpm build`

@@ -1,17 +1,17 @@
 # novel_digest 冒烟验收报告（M-A 等价 + 内核完备性验证）
 
-> 日期：2026-08-08。执行范围：冒烟实现 `novel_digest` 第二领域，并以它为试金石验证/加固 dagger kernel。
+> 日期：2026-08-08。执行范围：冒烟实现 `novel_digest` 第二领域，并以它为试金石验证/加固 divdag kernel。
 > 验收基线文档：`doc/plan/novel_digest_acceptance.md`；设计基线：`doc/design/universal_base_architecture.md` §14。
 
 ---
 
 ## 1. 范围声明
 
-本次交付 = **M-A 等价级**（含 `dagger run --domain novel_digest --backend mock` 真实 CLI 跑通）
+本次交付 = **M-A 等价级**（含 `divdag run --domain novel_digest --backend mock` 真实 CLI 跑通）
 + **内核完备性验证**（每一处「内核实现不当/缺失」按判定三问确认后直接修了内核，逐条登记 §3）。
 
 **未做**（等用户全流程验收）：M-B 真实 LLM、M-C/M-D 真实数据跑批与 kill 续跑、M-E 长时压测、
-前端 `pnpm dev` 手点验收、`dagger state archive` 的 `.daggerarc` 只读加载验收。
+前端 `pnpm dev` 手点验收、`divdag state archive` 的 `.divdagarc` 只读加载验收。
 
 测试口径：全仓 `uv run pytest -q` = **289 passed**（基线 182 → +107）；内核 `mypy --strict` 全绿；
 `ruff check .` / `ruff format --check .` 全绿；import-linter 两合同 kept。
@@ -26,7 +26,7 @@
 |------|------|------|
 | 完整 chapter.json 通过 schema 校验（SCHEMA_REGISTRY） | ✅ 自动化 | `domains/novel_digest/tests/test_schemas.py::TestChapterSchema::test_valid_chapter_passes` |
 | 缺字段被拒绝并给出字段级错误 | ✅ 自动化 | `test_schemas.py::test_missing_field_rejected_with_field_level_error`（错误含字段名）|
-| schema 进 `doc/contracts/` 自动生成流程 | ✅ 自动化+手动 | `scripts/dagger_check.py contracts` 现加载领域 schema（K7）；产物含 `novel_chapter`/`novel_volume_summary`/`novel_consistency_report`；连续两次执行产物 sha256 一致 |
+| schema 进 `doc/contracts/` 自动生成流程 | ✅ 自动化+手动 | `scripts/divdag_check.py contracts` 现加载领域 schema（K7）；产物含 `novel_chapter`/`novel_volume_summary`/`novel_consistency_report`；连续两次执行产物 sha256 一致 |
 
 ### Step 2 — 画 DAG 拓扑
 
@@ -57,7 +57,7 @@
 | next 幂等 | ✅ | `TestNext::test_next_is_idempotent_per_chapter`（二次执行零副作用：产物与指针字节不变）|
 | fill 坏文件退出码 3 + 字段级错误 | ✅ | `TestFill::test_fill_bad_file_exit_3_with_field_errors` |
 | check 时间线倒流退出码 2 | ✅ | `TestCheck::test_check_timeline_regression_exit_2` |
-| JSON 输出 + 退出码 0/1/2/3 + 幂等 | ✅ | 全部经 `dagger_cli.scaffold` 契约；`next` 语义：当前章未 fill 前不推进指针（崩溃不会跳章）|
+| JSON 输出 + 退出码 0/1/2/3 + 幂等 | ✅ | 全部经 `divdag_cli.scaffold` 契约；`next` 语义：当前章未 fill 前不推进指针（崩溃不会跳章）|
 
 ### Step 5 — 审查配置
 
@@ -72,17 +72,17 @@
 
 | 判据 | 状态 | 证据 |
 |------|------|------|
-| `dagger run --domain novel_digest --items <dir> --shards N --backend mock` 跑完无错 | ✅ | `packages/dagger_cli/tests/test_main.py::TestRunNovelDigest::test_mock_run_end_to_end`（退出码 0）+ 手动冒烟（§5 命令）|
+| `divdag run --domain novel_digest --items <dir> --shards N --backend mock` 跑完无错 | ✅ | `packages/divdag_cli/tests/test_main.py::TestRunNovelDigest::test_mock_run_end_to_end`（退出码 0）+ 手动冒烟（§5 命令）|
 | state 树符合 §14.3（control/items + contract/result + artifact slot） | ✅ | `test_walkthrough.py::test_full_run_two_shards` 逐项断言；CLI 测试断言 `control/items/<id>/item.json` |
-| `dagger state ls --layer artifact` 看到 slot | ✅ 替代 | walkthrough 断言 `store.query(layer="artifact", slot="summary")` 可取回（同一索引路径；`dagger state` CLI 即该 query 的薄壳）|
+| `divdag state ls --layer artifact` 看到 slot | ✅ 替代 | walkthrough 断言 `store.query(layer="artifact", slot="summary")` 可取回（同一索引路径；`divdag state` CLI 即该 query 的薄壳）|
 | EvidenceViewer 展示 summary slot | ⏳ 待全流程 | 前端手点（M5 server 的种子化路径未动）|
-| `.daggerarc` 只读加载 | ⏳ 待全流程 | 用户验收 |
+| `.divdagarc` 只读加载 | ⏳ 待全流程 | 用户验收 |
 
 ### §3 上线清单（机器可验证部分）
 
 | 判据 | 状态 | 证据 |
 |------|------|------|
-| 每节点 reads/writes 声明 + dry-run 校验 | ✅ | builtin 契约 fail-fast（`test_nodes.py`）；`dagger run --dry-run`（CLI 测试）|
+| 每节点 reads/writes 声明 + dry-run 校验 | ✅ | builtin 契约 fail-fast（`test_nodes.py`）；`divdag run --dry-run`（CLI 测试）|
 | ResultValidator 覆盖 off-by-one（漏章） | ✅ | `test_walkthrough.py::test_validator_catches_missed_chapter`（K3 真跑真拦截）|
 | 并行分支写同名 key 不冲突 | ✅ | 内核 `TestParallelWritesRule`（等值合并/异值抛错）+ walkthrough 全程无 ContextConflictError |
 | 幂等跳过零派发 | ✅ | walkthrough 二次 `run_graph` 派发计数为 0 |
@@ -101,8 +101,8 @@
 | K4 | `engine.py::_resolve_context` | Step 3 / cookbook：`{{ shard.item_count }}`/`{{ shard.last_item.id }}` 无值 | shard 视图充实（item_count/items/first_item/last_item），shard_seed 补 item_count | 语义已通用化 |
 | K5 | `review.py`（新）+ `spi.py` | Step 5：`scanners: list[Any]` 无类型占位、无 intent_diff 钩子 | `Finding`/`ScanContext`/`Scanner`/`IntentDiffProvider` 最小 SPI；`DomainPlugin.intent_diff()`/`mock_outputs()`；`scanners: list[Scanner]` | T7.2/T7.3（ReviewState/Highlight/Annotation）落地点 |
 | K8 | `engine.py::_propagate` | walkthrough 直接强制：原实现把分片节点的输出**广播到全部片**的目标实例，与 INTRA（本片）/SERIAL_PREV（下一片）语义矛盾；digest 的 `chapters_done` 分片异值必然误报 `ContextConflictError` | 缺陷修复：按 edge kind 定向投递（INTRA 同片 / SERIAL_PREV 下一片 / LAST 仅末片 / ALL 汇聚单实例 / RUN_ENTRY(_ALL) 扇出） | 语义校正，无后续 |
-| K6 | `dagger_cli/main.py`（宿主） | M-A 判据 1：CLI mock 路径 tiny 专用且带 bug | 修 `parents[4]` 路径 bug（计划原文 parents[3] 有误，实际指向 `packages/`）、本地域泛化加载（目录名=包名）、mock 通用化、传 skills/validators、修 `reg.templates()` 误调用与 `die()` 不退出两个潜在 bug | server 侧 mock 种子化已另有 `_seed_mock_artifacts` |
-| K7 | `scripts/dagger_check.py`（宿主） | Step 1：领域 kind 不进合同文档 | best-effort 导入 `<pkg>.schemas` 后生成 | 无 |
+| K6 | `divdag_cli/main.py`（宿主） | M-A 判据 1：CLI mock 路径 tiny 专用且带 bug | 修 `parents[4]` 路径 bug（计划原文 parents[3] 有误，实际指向 `packages/`）、本地域泛化加载（目录名=包名）、mock 通用化、传 skills/validators、修 `reg.templates()` 误调用与 `die()` 不退出两个潜在 bug | server 侧 mock 种子化已另有 `_seed_mock_artifacts` |
+| K7 | `scripts/divdag_check.py`（宿主） | Step 1：领域 kind 不进合同文档 | best-effort 导入 `<pkg>.schemas` 后生成 | 无 |
 
 **「内核零改动跑通了吗？」——没有。** 共 6 处内核改动（K1–K5、K8）+ 2 处宿主修复（K6、K7）。
 逐条论证「通用能力」：K1/K2/K8 是拓扑与上下文创播语义（任何含 run 级收口链/串行链的领域都会踩中，
@@ -140,7 +140,7 @@ novel_digest 私有需求进内核——领域私有的（章节扫描、prompt�
    加权切分为近似算法，5 章小样例 `--shards 2` 实际切 3 片。判据只要求「跑完无错」，符合；
    真实数据的片数调参属 M-C/M-D。
 6. **StateSeeder / prompt_composer / result_recoverers 未接线**：spi.py 的占位钩子保持原样；
-   noveltool 的 `<out>/pointer.json` 与设计 §7.3 的 `.dagger/cursor.json` 对齐留后续项（D10）。
+   noveltool 的 `<out>/pointer.json` 与设计 §7.3 的 `.divdag/cursor.json` 对齐留后续项（D10）。
 7. **executor key 未命名空间化**：为照抄 §14.2，`digest`/`entity_merge` 等用裸 key（非
    `novel.digest`）。ExecutorCatalog 全局唯一，多域同装时有撞名风险——后续可考虑模板侧
    node_type 前缀化或 catalog 按域分区。
@@ -151,21 +151,21 @@ novel_digest 私有需求进内核——领域私有的（章节扫描、prompt�
 
 ```bash
 uv sync
-# 全量测试（289 passed：内核 131 + dagger_agent 37 + CLI 7 + tiny 2 + novel_digest 68 + server 44）
+# 全量测试（289 passed：内核 131 + divdag_agent 37 + CLI 7 + tiny 2 + novel_digest 68 + server 44）
 uv run pytest -q
 # 质量门槛
 uv run ruff check . && uv run ruff format --check .
-uv run mypy packages/dagger_kernel/src
+uv run mypy packages/divdag_kernel/src
 .venv/Scripts/lint-imports.exe
 # 合同文档（二次执行 git diff 应为空）
-uv run python scripts/dagger_check.py contracts
+uv run python scripts/divdag_check.py contracts
 # 前端类型检查
 web\node_modules\.bin\tsc.CMD --noEmit -p web\tsconfig.app.json   # 仓库根执行时用 -p web/tsconfig.app.json
 # 手动冒烟（在任意临时目录执行）
 uv run python -m novel_digest.testing <tmp>\book --chapters 5
-.venv\Scripts\dagger.exe domains                                     # 列出 tiny + novel_digest
-cd <tmp> && <repo>\.venv\Scripts\dagger.exe run --domain novel_digest --items <tmp>\book --shards 2 --backend mock
-# 期望：completed=18 failed=0 skipped=0，退出码 0；state 树在 <tmp>\.dagger\<run_id>\state
+.venv\Scripts\divdag.exe domains                                     # 列出 tiny + novel_digest
+cd <tmp> && <repo>\.venv\Scripts\divdag.exe run --domain novel_digest --items <tmp>\book --shards 2 --backend mock
+# 期望：completed=18 failed=0 skipped=0，退出码 0；state 树在 <tmp>\.divdag\<run_id>\state
 <repo>\.venv\Scripts\noveltool.exe status --root <tmp>\book --out <tmp>\book\<run_id>\shard-000
 ```
 
@@ -176,7 +176,7 @@ cd <tmp> && <repo>\.venv\Scripts\dagger.exe run --domain novel_digest --items <t
 - WorkspaceProvider 全 SPI（git-worktree/copy-dir/snapshot/release/ResourceBudget）未做。
 - EvidenceViewer 种子化属 server `_seed_mock_artifacts`（M5+ 全流程验证）；冒烟只验证 spec 注册 +
   slot 坐标一致 + mock 写 summary slot 可 query 取回。
-- StateSeeder/prompt_composer/result_recoverers 钩子未接线；`.dagger/cursor.json` 与 noveltool
+- StateSeeder/prompt_composer/result_recoverers 钩子未接线；`.divdag/cursor.json` 与 noveltool
   `pointer.json` 的对齐留后续项。
 - 前端 `pnpm dev` 手点（时间线页 / 台账列 / 审查 tab）待全流程；tiny 的前端 bundle 缺失未补
   （不动 tiny，仅记录）。本机 pnpm 不在 PATH，前端验证改用 `web\node_modules\.bin\tsc.CMD
@@ -187,11 +187,11 @@ cd <tmp> && <repo>\.venv\Scripts\dagger.exe run --domain novel_digest --items <t
 
 按验收文档 §2 的 M-A→M-E 路径推进：
 
-1. **M-A 复验**：跑 §5 的手动冒烟命令；检查 `<tmp>\.dagger\<run_id>\state` 的五层树；
-   `dagger-state ls --run <run_root> --layer artifact`（artifact 层需先经 server mock 种子化或
+1. **M-A 复验**：跑 §5 的手动冒烟命令；检查 `<tmp>\.divdag\<run_id>\state` 的五层树；
+   `divdag-state ls --run <run_root> --layer artifact`（artifact 层需先经 server mock 种子化或
    walkthrough 写入）；前端起 `pnpm -C web dev` 打开 EvidenceViewer。
-2. **M-B**：起 opencode 兼容后端，`dagger run --domain novel_digest --backend opencode-http`
+2. **M-B**：起 opencode 兼容后端，`divdag run --domain novel_digest --backend opencode-http`
    单章跑通；单节点 `noveltool next/fill/check` 手验；kill 续跑看 cursor。
 3. **M-C**：单片 5–10 章，验证 `prev_timeline_path` 串接与 `--resume` 幂等跳过。
 4. **M-D**：3 片 × 5 章真实数据，看 ALL 汇聚时点 + Scanner 全套 + final_report 产物。
-5. **M-E**：全本长时跑 + 3 次以上中断续跑 + `dagger state verify` 全绿 + `can_run: false` 审阅部署。
+5. **M-E**：全本长时跑 + 3 次以上中断续跑 + `divdag state verify` 全绿 + `can_run: false` 审阅部署。

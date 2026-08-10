@@ -1,5 +1,5 @@
 /**
- * Generate OpenAPI schema + TS types from a running dagger_server.
+ * Generate OpenAPI schema + TS types from a running divdag_server.
  *
  * Usage:
  *   pnpm gen:sdk              # fetch from VITE_SERVER_URL (default http://localhost:8000), regenerate types.gen.ts
@@ -38,7 +38,7 @@ async function fetchSchema(): Promise<string> {
   }
   throw new Error(
     `Cannot fetch OpenAPI from ${SERVER_URL}${SCHEMA_PATH} and no committed fallback at ${OPENAPI_JSON}. ` +
-      `Start dagger_server first (uv run python -m dagger_server).`,
+      `Start divdag_server first (uv run python -m divdag_server).`,
   )
 }
 
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const generated = await generateTypes(schema)
 
   if (checkMode) {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'dagger-sdk-'))
+    const tmpDir = mkdtempSync(join(tmpdir(), 'divdag-sdk-'))
     const tmpFile = join(tmpDir, 'types.gen.ts')
     writeFileSync(tmpFile, generated, 'utf-8')
     const committed = readFileSync(TYPES_GEN, 'utf-8')

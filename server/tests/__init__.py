@@ -1,1 +1,1 @@
-"""Marker package for dagger_server tests."""
+"""Marker package for divdag_server tests."""

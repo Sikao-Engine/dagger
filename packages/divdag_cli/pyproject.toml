@@ -1,0 +1,24 @@
+[project]
+name = "divdag_cli"
+version = "0.1.0"
+description = "Deterministic CLI scaffold for DivDag (Agent-facing state write path)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "divdag_kernel",
+    "click>=8.1",
+]
+
+[project.scripts]
+divdag = "divdag_cli.main:cli"
+"divdag-state" = "divdag_cli.state_cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/divdag_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md"]

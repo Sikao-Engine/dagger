@@ -7,13 +7,13 @@ guard passes, then assert the guard would catch an absolute path (defensive).
 
 from __future__ import annotations
 
-from dagger_server.database import (
+from divdag_server.database import (
     create_all,
     make_engine,
     make_session_factory,
     sqlite_url,
 )
-from dagger_server.repositories import (
+from divdag_server.repositories import (
     assert_no_absolute_paths,
     create_attempt,
     create_run,
@@ -78,7 +78,7 @@ def test_relative_path_invariant_holds(tmp_path) -> None:
 
 def test_relative_path_invariant_catches_absolute(tmp_path) -> None:
     """If an absolute path sneaks into a *_rel column, the guard flags it."""
-    from dagger_server.models import NodeRun
+    from divdag_server.models import NodeRun
 
     factory = _factory(tmp_path)
     with factory() as s:
@@ -100,7 +100,7 @@ def test_relative_path_invariant_catches_absolute(tmp_path) -> None:
             transcript_path_rel="C:/abs/path/transcript.jsonl",
         )
         # Directly corrupt the run's rel column to simulate a regression.
-        run.state_root_rel = "/abs/dagger/run_bad/state"
+        run.state_root_rel = "/abs/divdag/run_bad/state"
         s.commit()
     with factory() as s:
         violations = assert_no_absolute_paths(s)

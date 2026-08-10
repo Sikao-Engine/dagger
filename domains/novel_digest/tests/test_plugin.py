@@ -6,11 +6,11 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from dagger_kernel.dag import NodeContext, NodeRegistry
-from dagger_kernel.executors import ExecutorCatalog
-from dagger_kernel.review import Scanner
-from dagger_kernel.spi import DomainRegistry
-from dagger_kernel.state import K
+from divdag_kernel.dag import NodeContext, NodeRegistry
+from divdag_kernel.executors import ExecutorCatalog
+from divdag_kernel.review import Scanner
+from divdag_kernel.spi import DomainRegistry
+from divdag_kernel.state import K
 from novel_digest.items import ChapterSource
 from novel_digest.plugin import NovelPlugin, validate_digest_result
 from novel_digest.review import NovelIntentDiff

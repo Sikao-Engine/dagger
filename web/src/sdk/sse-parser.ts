@@ -1,8 +1,8 @@
 /**
  * SSE event parser for opencode-compatible streaming.
- * is shared between the agentcli backend and dagger_agent's opencode-http.
+ * is shared between the agentcli backend and divdag_agent's opencode-http.
  *
- * Dagger's DaggerEvent (run/node lifecycle) arrives via the run-level stream as a
+ * DivDag's DivDagEvent (run/node lifecycle) arrives via the run-level stream as a
  * JSON `data:` line whose shape mirrors `events.to_dict()` (seq/type/data/...).
  * This parser only normalizes Attempt Agent events (transcript lines).
  */

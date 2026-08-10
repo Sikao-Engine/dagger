@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "packages/dagger_kernel",
-    "packages/dagger_agent",
-    "packages/dagger_cli",
+    "packages/divdag_kernel",
+    "packages/divdag_agent",
+    "packages/divdag_cli",
     "domains/tiny",
     "domains/novel_digest",
     "server",
@@ -16,9 +16,9 @@ readme = "README.md"
 
 [tool.uv.workspace]
 members = [
-    "packages/dagger_kernel",
-    "packages/dagger_agent",
-    "packages/dagger_cli",
+    "packages/divdag_kernel",
+    "packages/divdag_agent",
+    "packages/divdag_cli",
     "domains/tiny",
     "domains/novel_digest",
     "server",
@@ -27,10 +27,10 @@ members = [
 exclude = ["domains/novel_digest/noveltool"]
 
 [tool.uv.sources]
-dagger_kernel = { workspace = true }
-dagger_agent = { workspace = true }
-dagger_cli = { workspace = true }
-dagger_server = { workspace = true }
+divdag_kernel = { workspace = true }
+divdag_agent = { workspace = true }
+divdag_cli = { workspace = true }
+divdag_server = { workspace = true }
 
 [tool.uv]
 dev-dependencies = [
@@ -59,22 +59,22 @@ ignore = ["PLR0912", "PLR0913", "PLR2004", "PLW0603", "RUF001", "RUF002", "RUF00
 "**/tests/**" = ["PLR2004", "S101", "PLR0913", "PLC0415"]
 "domains/**/tests/**" = ["PLR2004", "S101"]
 "scripts/**" = ["PLC0415"]
-"packages/dagger_cli/**" = ["PLC0415", "PLR0915", "PLR0917"]
+"packages/divdag_cli/**" = ["PLC0415", "PLR0915", "PLR0917"]
 # Vendored opencode client/process_manager/sse_parser: faithful port of CubeClaw's
 # long-validated code; dispatch-by-type has many returns, Popen needs raw file
 # handles, and httpx is imported lazily (optional dep path).
-"packages/dagger_agent/src/dagger_agent/opencode/**" = ["PLR0911", "SIM115", "PLC0415"]
-"packages/dagger_agent/src/dagger_agent/backends/opencode_http.py" = ["PLR0911"]
+"packages/divdag_agent/src/divdag_agent/opencode/**" = ["PLR0911", "SIM115", "PLC0415"]
+"packages/divdag_agent/src/divdag_agent/backends/opencode_http.py" = ["PLR0911"]
 # State module: lazy imports avoid optional deps (jsonschema) + circular imports
 # (SchemaError is raised only on the failure path); layout/key use dispatch-by-key
 # with one return per branch (pinned by snapshot tests); RetryPolicy/Layer/Scope
 # stay str+Enum for backwards-compatible .value access on 3.12.
-"packages/dagger_kernel/src/dagger_kernel/state/**" = ["PLC0415", "PLR0911", "PLR0915", "PLR0917", "SIM103", "SIM105", "UP042", "E741"]
+"packages/divdag_kernel/src/divdag_kernel/state/**" = ["PLC0415", "PLR0911", "PLR0915", "PLR0917", "SIM103", "SIM105", "UP042", "E741"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["packages/dagger_kernel/src"]
+files = ["packages/divdag_kernel/src"]
 exclude = ["domains/", "server/", "web/"]
 
 [[tool.mypy.overrides]]
@@ -86,9 +86,9 @@ testpaths = ["packages", "domains", "server"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers --import-mode=importlib"
 pythonpath = [
-    "packages/dagger_kernel",
-    "packages/dagger_agent",
-    "packages/dagger_cli",
+    "packages/divdag_kernel",
+    "packages/divdag_agent",
+    "packages/divdag_cli",
     "domains/tiny",
     "domains/novel_digest",
     "server/src",
@@ -96,24 +96,24 @@ pythonpath = [
 markers = ["e2e: end-to-end tests"]
 
 [tool.coverage.run]
-source = ["dagger_kernel", "dagger_agent", "dagger_cli", "dagger_server"]
+source = ["divdag_kernel", "divdag_agent", "divdag_cli", "divdag_server"]
 branch = true
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "raise NotImplementedError", "if TYPE_CHECKING:"]
 
 [tool.importlinter]
-root_packages = ["dagger_kernel", "dagger_server"]
+root_packages = ["divdag_kernel", "divdag_server"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Kernel must not import outer packages"
 type = "forbidden"
-source_modules = ["dagger_kernel"]
-forbidden_modules = ["dagger_agent", "server", "domains", "tiny", "novel_digest"]
+source_modules = ["divdag_kernel"]
+forbidden_modules = ["divdag_agent", "server", "domains", "tiny", "novel_digest"]
 
 [[tool.importlinter.contracts]]
 name = "Server must not import concrete domain modules"
 type = "forbidden"
-source_modules = ["dagger_server"]
+source_modules = ["divdag_server"]
 forbidden_modules = ["tiny", "novel_digest", "domains"]

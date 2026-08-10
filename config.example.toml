@@ -1,12 +1,12 @@
-# Dagger server config — copy this file anywhere, edit, then run:
+# DivDag server config — copy this file anywhere, edit, then run:
 #
 #     uv run server/main_server.py -c path/to/your.toml
 #
 # All relative paths resolve against THIS FILE's directory, so the config is
 # portable: it never depends on where you launch the command from.
 
-# Required. The working directory Dagger opens: run state trees live under
-# <workspace>/.dagger, the SQLite DB defaults to <workspace>/dagger.db.
+# Required. The working directory DivDag opens: run state trees live under
+# <workspace>/.divdag, the SQLite DB defaults to <workspace>/divdag.db.
 # For the novel_digest domain this is the book dir containing chapters/*.txt.
 workspace = "../my-book"
 
@@ -14,11 +14,11 @@ workspace = "../my-book"
 # host = "127.0.0.1"
 # port = 8000
 
-# Where run state trees live. Default: <workspace>/.dagger
-# data_dir = ".dagger"
+# Where run state trees live. Default: <workspace>/.divdag
+# data_dir = ".divdag"
 
-# SQLAlchemy URL. Default: sqlite at <workspace>/dagger.db
-# db_url = "sqlite:///dagger.db"
+# SQLAlchemy URL. Default: sqlite at <workspace>/divdag.db
+# db_url = "sqlite:///divdag.db"
 
 # Built frontend bundle (`cd web && pnpm build` output). When set, the SPA is
 # served at `/` with deep-link fallback; drop the key to run API-only.

@@ -1,4 +1,4 @@
-"""E2E: dagger run --domain tiny produces a complete, verifiable state tree.
+"""E2E: divdag run --domain tiny produces a complete, verifiable state tree.
 
 This is the M4 walking-skeleton acceptance test. Uses the mock dispatcher
 (shortcuts the real SessionRunner); a real-backend run is a manual check.
@@ -9,14 +9,14 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from dagger_kernel.dag import NodeRegistry
-from dagger_kernel.dag.instantiator import instantiate
-from dagger_kernel.dag.nodes import NodeContract
-from dagger_kernel.engine import run_graph
-from dagger_kernel.executors import ExecutorCatalog
-from dagger_kernel.planning import fixed_size
-from dagger_kernel.planning.item import WorkItem
-from dagger_kernel.state import K, StateStore
+from divdag_kernel.dag import NodeRegistry
+from divdag_kernel.dag.instantiator import instantiate
+from divdag_kernel.dag.nodes import NodeContract
+from divdag_kernel.engine import run_graph
+from divdag_kernel.executors import ExecutorCatalog
+from divdag_kernel.planning import fixed_size
+from divdag_kernel.planning.item import WorkItem
+from divdag_kernel.state import K, StateStore
 from tiny.plugin import TinyPlugin
 
 
@@ -24,7 +24,7 @@ class _NoopInit:
     contract = NodeContract(writes=("initialized",))
 
     def run(self, ctx):
-        from dagger_kernel.dag import ContextPatch
+        from divdag_kernel.dag import ContextPatch
 
         return ContextPatch(values={"initialized": True})
 

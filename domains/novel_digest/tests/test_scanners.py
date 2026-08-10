@@ -8,8 +8,8 @@ cross-item consistency (timeline regression).
 
 from __future__ import annotations
 
-from dagger_kernel.planning import WorkItem
-from dagger_kernel.review import ScanContext
+from divdag_kernel.planning import WorkItem
+from divdag_kernel.review import ScanContext
 from novel_digest.scanners import (
     SCANNERS,
     AbnormalLengthScanner,

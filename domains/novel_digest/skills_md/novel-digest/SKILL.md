@@ -1,6 +1,6 @@
 ---
 name: novel-digest
-description: 逐章摘要 + 实体抽取 + 时间线增量。Use when: 收到 /novel-digest 指令，需要处理一个分片内的连续章节（Dagger novel_digest 领域的主链 agent 节点）。
+description: 逐章摘要 + 实体抽取 + 时间线增量。Use when: 收到 /novel-digest 指令，需要处理一个分片内的连续章节（DivDag novel_digest 领域的主链 agent 节点）。
 ---
 
 # novel-digest — 分片逐章消化

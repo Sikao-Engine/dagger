@@ -1,4 +1,4 @@
-"""Shared fixtures for dagger_server tests."""
+"""Shared fixtures for divdag_server tests."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ from typing import Any
 import pytest
 from litestar.testing import TestClient
 
-from dagger_server.app import create_app
-from dagger_server.database import sqlite_url
+from divdag_server.app import create_app
+from divdag_server.database import sqlite_url
 
 
 @pytest.fixture
 def data_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "dagger_data"
+    d = tmp_path / "divdag_data"
     d.mkdir()
     return d
 

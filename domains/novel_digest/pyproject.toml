@@ -1,12 +1,12 @@
 [project]
-name = "dagger-domain-novel-digest"
+name = "divdag-domain-novel-digest"
 version = "0.1.0"
-description = "Novel digest domain for Dagger: chapter summary + timeline + consistency"
+description = "Novel digest domain for DivDag: chapter summary + timeline + consistency"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["dagger_kernel", "dagger_cli", "jinja2>=3.1"]
+dependencies = ["divdag_kernel", "divdag_cli", "jinja2>=3.1"]
 
-[project.entry-points."dagger.domains"]
+[project.entry-points."divdag.domains"]
 novel_digest = "novel_digest.plugin:plugin"
 
 [project.scripts]

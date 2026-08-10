@@ -7,7 +7,7 @@ re-registered here. Node-type keys follow §14.2's bare names (`digest`,
 
 from __future__ import annotations
 
-from dagger_kernel.executors import ExecutorSpec
+from divdag_kernel.executors import ExecutorSpec
 
 EXECUTORS: list[ExecutorSpec] = [
     ExecutorSpec(
