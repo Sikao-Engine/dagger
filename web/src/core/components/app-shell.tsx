@@ -42,7 +42,7 @@ export default function AppShell({ children }: AppShellProps) {
       <aside className="w-14 lg:w-52 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="h-14 flex items-center px-3 border-b border-slate-800">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-xs">
-            LM
+            DD
           </div>
           <span className="ml-2 font-bold text-sm text-slate-200 hidden lg:block">DivDag</span>
         </div>

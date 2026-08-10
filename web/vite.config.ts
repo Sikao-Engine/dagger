@@ -5,8 +5,13 @@ import { resolve } from 'node:path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const serverUrl = env.VITE_SERVER_URL || 'http://localhost:8000'
-
+  // Baked into the bundle. Empty = same origin, which is what the server's
+  // static hosting needs (a hard-coded host breaks when the page is served
+  // from a different one, e.g. 127.0.0.1 vs localhost → CORS).
+  const serverUrl = env.VITE_SERVER_URL || ''
+  // Dev-only: `vite dev` proxies /api to the backend.
+  const devProxyTarget = env.VITE_SERVER_URL || 'http://localhost:8000'
+ 
   return {
     base: './',
     plugins: [react(), tailwindcss()],
@@ -27,7 +32,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': {
-          target: serverUrl,
+          target: devProxyTarget,
           changeOrigin: true,
         },
       },

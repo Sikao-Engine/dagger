@@ -16,6 +16,7 @@ DIVDAG_HOST / DIVDAG_PORT with `./divdag.db` + `./.divdag` defaults.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Any
 
@@ -115,7 +116,7 @@ def create_app(
             version="0.1.0",
             path="/api/v1/schema",
         ),
-        debug=True,
+        debug=bool(os.environ.get("DIVDAG_DEBUG")),
         **kwargs,
     )
     return app
