@@ -1,4 +1,4 @@
-"""Tests for loom_server.config (TOML loading) + web_dist static serving."""
+"""Tests for dagger_server.config (TOML loading) + web_dist static serving."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 from litestar.testing import TestClient
 
-from loom_server.app import create_app
-from loom_server.config import DEFAULT_HOST, DEFAULT_PORT, LoomConfig, load_config
-from loom_server.database import sqlite_url
+from dagger_server.app import create_app
+from dagger_server.config import DEFAULT_HOST, DEFAULT_PORT, DaggerConfig, load_config
+from dagger_server.database import sqlite_url
 
 
 def _write(path: Path, text: str) -> Path:
@@ -20,14 +20,14 @@ def _write(path: Path, text: str) -> Path:
 
 class TestLoadConfig:
     def test_minimal_config_defaults_from_workspace(self, tmp_path: Path) -> None:
-        cfg_path = _write(tmp_path / "loom.toml", 'workspace = "../my-book"\n')
+        cfg_path = _write(tmp_path / "dagger.toml", 'workspace = "../my-book"\n')
         cfg = load_config(cfg_path)
 
         assert cfg.workspace == (tmp_path / ".." / "my-book").resolve()
         assert cfg.host == DEFAULT_HOST
         assert cfg.port == DEFAULT_PORT
-        assert cfg.resolved_db_url() == sqlite_url(cfg.workspace / "loom.db")
-        assert cfg.resolved_data_dir() == cfg.workspace / ".loom"
+        assert cfg.resolved_db_url() == sqlite_url(cfg.workspace / "dagger.db")
+        assert cfg.resolved_data_dir() == cfg.workspace / ".dagger"
         assert cfg.web_dist is None
 
     def test_relative_paths_resolve_against_config_dir(
@@ -40,7 +40,7 @@ class TestLoadConfig:
         cfg_dir = tmp_path / "cfg"
         cfg_dir.mkdir()
         cfg_path = _write(
-            tmp_path / "cfg" / "loom.toml",
+            tmp_path / "cfg" / "dagger.toml",
             'workspace = "book"\ndata_dir = "state"\nweb_dist = "ui/dist"\n'
             'host = "0.0.0.0"\nport = 9000\ndb_url = "sqlite:///explicit.db"\n',
         )
@@ -55,16 +55,16 @@ class TestLoadConfig:
         assert cfg.resolved_db_url() == "sqlite:///explicit.db"
 
     def test_missing_workspace_is_a_config_error(self, tmp_path: Path) -> None:
-        cfg_path = _write(tmp_path / "loom.toml", "port = 8000\n")
+        cfg_path = _write(tmp_path / "dagger.toml", "port = 8000\n")
         with pytest.raises(ValueError, match="workspace"):
             load_config(cfg_path)
 
     def test_env_fallback_for_db_and_data(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("LOOM_DB_URL", "sqlite:///env.db")
-        monkeypatch.setenv("LOOM_DATA_DIR", str(tmp_path / "env_state"))
-        cfg = LoomConfig(workspace=tmp_path)
+        monkeypatch.setenv("DAGGER_DB_URL", "sqlite:///env.db")
+        monkeypatch.setenv("DAGGER_DATA_DIR", str(tmp_path / "env_state"))
+        cfg = DaggerConfig(workspace=tmp_path)
         assert cfg.resolved_db_url() == "sqlite:///env.db"
         assert cfg.resolved_data_dir() == tmp_path / "env_state"
 
@@ -74,7 +74,7 @@ class TestWebDistServing:
     def web_dist(self, tmp_path: Path) -> Path:
         d = tmp_path / "dist"
         d.mkdir()
-        (d / "index.html").write_text("<html>loom-spa</html>", encoding="utf-8")
+        (d / "index.html").write_text("<html>dagger-spa</html>", encoding="utf-8")
         (d / "app.js").write_text("console.log('x')", encoding="utf-8")
         return d
 
@@ -92,7 +92,7 @@ class TestWebDistServing:
     def test_index_served_at_root(self, client: Any) -> None:
         r = client.get("/")
         assert r.status_code == 200
-        assert "loom-spa" in r.text
+        assert "dagger-spa" in r.text
 
     def test_static_asset_served(self, client: Any) -> None:
         r = client.get("/app.js")
@@ -102,7 +102,7 @@ class TestWebDistServing:
         r = client.get("/runs/some-run-id")
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/html")
-        assert "loom-spa" in r.text
+        assert "dagger-spa" in r.text
 
     def test_api_404_stays_json(self, client: Any) -> None:
         r = client.get("/api/v1/definitely-not-a-route")

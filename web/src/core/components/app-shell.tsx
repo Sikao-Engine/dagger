@@ -44,7 +44,7 @@ export default function AppShell({ children }: AppShellProps) {
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-xs">
             LM
           </div>
-          <span className="ml-2 font-bold text-sm text-slate-200 hidden lg:block">Loom</span>
+          <span className="ml-2 font-bold text-sm text-slate-200 hidden lg:block">Dagger</span>
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-1">

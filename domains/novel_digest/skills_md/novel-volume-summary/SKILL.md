@@ -1,6 +1,6 @@
 ---
 name: novel-volume-summary
-description: 分卷总述。Use when: 收到 /novel-volume-summary 指令，本片时间线已累积完成，需要为一卷（连续章节区间）写总述（Loom novel_digest 领域的侧链 agent 节点）。
+description: 分卷总述。Use when: 收到 /novel-volume-summary 指令，本片时间线已累积完成，需要为一卷（连续章节区间）写总述（Dagger novel_digest 领域的侧链 agent 节点）。
 ---
 
 # novel-volume-summary — 分卷总述

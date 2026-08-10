@@ -1,4 +1,4 @@
-"""novel_digest: Loom's second domain — long-novel digest pipeline.
+"""novel_digest: Dagger's second domain — long-novel digest pipeline.
 
 Pipeline: chapter digest → entity merge → timeline merge (serial across shards)
 → volume summary → consistency check → final report.

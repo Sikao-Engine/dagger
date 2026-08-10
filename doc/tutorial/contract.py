@@ -1,1 +1,1 @@
-`python -m loom_check contracts`
+`python -m dagger_check contracts`

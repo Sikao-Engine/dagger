@@ -1,6 +1,6 @@
 ---
 name: novel-consistency
-description: 全局一致性校验。Use when: 收到 /novel-consistency 指令，全部分片的实体归并与分卷总述已完成，需要产出矛盾清单（Loom novel_digest 领域的汇聚 agent 节点）。
+description: 全局一致性校验。Use when: 收到 /novel-consistency 指令，全部分片的实体归并与分卷总述已完成，需要产出矛盾清单（Dagger novel_digest 领域的汇聚 agent 节点）。
 ---
 
 # novel-consistency — 全局一致性校验

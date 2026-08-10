@@ -12,22 +12,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from loom_server.database import (
+from dagger_server.database import (
     create_all,
     make_engine,
     make_session_factory,
     sqlite_url,
 )
-from loom_server.domain_runtime import assemble_runtime
-from loom_server.events import EventBus
-from loom_server.repositories import (
+from dagger_server.domain_runtime import assemble_runtime
+from dagger_server.events import EventBus
+from dagger_server.repositories import (
     assert_no_absolute_paths,
     list_attempts,
     list_events,
     list_node_runs,
     list_shards,
 )
-from loom_server.scheduler import Scheduler, ScheduleRequest
+from dagger_server.scheduler import Scheduler, ScheduleRequest
 
 
 def _make_items(root: Path) -> Path:
@@ -98,7 +98,7 @@ def test_scheduler_runs_tiny_end_to_end(tmp_path: Path) -> None:
     assert violations == [], violations
 
     # StateStore tree verifies clean.
-    from loom_kernel.state import StateStore
+    from dagger_kernel.state import StateStore
 
     store = StateStore(scheduler.data_dir / "run_test", run_id="run_test")
     assert store.verify() == []
@@ -134,7 +134,7 @@ def test_scheduler_reuses_engine_readiness(tmp_path: Path) -> None:
     We assert by structure: the scheduler's only graph-execution call is
     run_graph (verified by patching it to count invocations).
     """
-    import loom_server.scheduler as sched_mod
+    import dagger_server.scheduler as sched_mod
 
     items = _make_items(tmp_path / "items")
     scheduler, factory, _, _ = _build_scheduler(tmp_path)

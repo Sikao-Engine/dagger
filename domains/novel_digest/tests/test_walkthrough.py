@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from loom_kernel.dag import NodeRegistry
-from loom_kernel.dag.instantiator import ShardPlan, instantiate
-from loom_kernel.engine import run_graph
-from loom_kernel.executors import ExecutorCatalog
-from loom_kernel.spi import DomainRegistry
-from loom_kernel.state import K, StateStore
+from dagger_kernel.dag import NodeRegistry
+from dagger_kernel.dag.instantiator import ShardPlan, instantiate
+from dagger_kernel.engine import run_graph
+from dagger_kernel.executors import ExecutorCatalog
+from dagger_kernel.spi import DomainRegistry
+from dagger_kernel.state import K, StateStore
 from novel_digest.plugin import NovelPlugin
 from novel_digest.testing import make_book
 

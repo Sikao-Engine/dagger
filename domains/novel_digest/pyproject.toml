@@ -1,12 +1,12 @@
 [project]
-name = "loom-domain-novel-digest"
+name = "dagger-domain-novel-digest"
 version = "0.1.0"
-description = "Novel digest domain for Loom: chapter summary + timeline + consistency"
+description = "Novel digest domain for Dagger: chapter summary + timeline + consistency"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["loom_kernel", "loom_cli", "jinja2>=3.1"]
+dependencies = ["dagger_kernel", "dagger_cli", "jinja2>=3.1"]
 
-[project.entry-points."loom.domains"]
+[project.entry-points."dagger.domains"]
 novel_digest = "novel_digest.plugin:plugin"
 
 [project.scripts]

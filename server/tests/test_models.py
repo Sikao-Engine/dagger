@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import inspect
 
-from loom_server.database import (
+from dagger_server.database import (
     create_all,
     make_engine,
     make_session_factory,
@@ -64,7 +64,7 @@ def test_foreign_keys_enforced(tmp_path) -> None:
     engine = make_engine(sqlite_url(tmp_path / "t.db"))
     create_all(engine)
     factory = make_session_factory(engine)
-    from loom_server.models import NodeRun
+    from dagger_server.models import NodeRun
 
     session = factory()
     session.add(NodeRun(id="n1", run_id="nope", node_key="x", node_type="x"))

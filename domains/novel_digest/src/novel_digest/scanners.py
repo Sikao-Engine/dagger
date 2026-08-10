@@ -18,9 +18,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from loom_kernel.planning import WorkItem
-from loom_kernel.review import Finding, ScanContext
-from loom_kernel.state.schema import validate as validate_schema
+from dagger_kernel.planning import WorkItem
+from dagger_kernel.review import Finding, ScanContext
+from dagger_kernel.state.schema import validate as validate_schema
 
 from .schemas import NOVEL_CHAPTER
 

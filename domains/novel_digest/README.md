@@ -1,6 +1,6 @@
 # domains/novel_digest
 
-Second domain — validates that Loom's abstractions generalize beyond `tiny`.
+Second domain — validates that Dagger's abstractions generalize beyond `tiny`.
 
 Pipeline: chapter digest → entity merge → timeline merge (serial across shards)
 → volume summary → consistency check → final report. Mirrors CubeClaw's
@@ -12,7 +12,7 @@ kernel change forced by this domain is logged as a leak and fed back as new SPI.
 ## 冒烟状态（2026-08-08）
 
 **M-A 等价级完成**：SPI 五件套 + noveltool + Scanner + IntentDiff + 前端起点全部落地；
-`loom run --domain novel_digest --backend mock` 真实 CLI 跑通；为补齐内核缺口做了
+`dagger run --domain novel_digest --backend mock` 真实 CLI 跑通；为补齐内核缺口做了
 K1–K8 八处内核/宿主修复（全部带测试钉死，逐条见回归表）。
 
 - 验收报告：`doc/plan/novel_digest_smoke_report.md`（判据映射 / 内核回归表 / 设计张力 / 复验命令）
@@ -27,7 +27,7 @@ K1–K8 八处内核/宿主修复（全部带测试钉死，逐条见回归表�
 uv run domains/novel_digest/install.py                # 1. skill → ~/.agents/skills
 cd domains/novel_digest/noveltool && uv tool install -e .   # 2. noveltool → PATH
 cd web && pnpm install && pnpm build                  # 3. 前端 → web/dist
-uv run server/main_server.py -c my-loom.toml          # 4. 按 config 打开工作区
+uv run server/main_server.py -c my-dagger.toml          # 4. 按 config 打开工作区
 ```
 
 开发与测试：
@@ -37,7 +37,7 @@ uv sync
 uv run pytest domains/novel_digest -q          # 68 个领域测试
 # 手动冒烟（mock 后端，真实 CLI + 真实文件产出）
 uv run python -m novel_digest.testing /tmp/book --chapters 5
-uv run loom run --domain novel_digest --items /tmp/book --shards 2 --backend mock
+uv run dagger run --domain novel_digest --items /tmp/book --shards 2 --backend mock
 noveltool status --root /tmp/book --out /tmp/book/<run_id>/shard-000   # noveltool 已在 PATH
 ```
 
@@ -50,7 +50,7 @@ domains/novel_digest/
 ├── noveltool/     # 独立 uv tool 薄封装包（uv tool install -e . → noveltool 上 PATH）
 └── src/novel_digest/
     ├── plugin.py      # NovelPlugin（DomainPlugin SPI 全钩子）+ digest ResultValidator + WeightedChapterSharder
-    ├── items.py       # ChapterSource：扫 chapters/*.txt，卷边界 → Milestone，frontier 读 .loom/cursor.json
+    ├── items.py       # ChapterSource：扫 chapters/*.txt，卷边界 → Milestone，frontier 读 .dagger/cursor.json
     ├── templates.py   # build_template(workspace_root)：设计 §14.2 逐字照抄（8 节点 9 边）
     ├── executors.py   # 6 个 ExecutorSpec（ensure_workspace 由内核提供）
     ├── skills.py      # 4 个 SkillSpec + Jinja2 render_prompt（快照测试钉死）

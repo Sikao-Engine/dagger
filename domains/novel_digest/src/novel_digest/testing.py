@@ -5,7 +5,7 @@ Deterministic fixture builders shared by the test suite and usable by hand:
     python -m novel_digest.testing <target_dir> [--chapters N]
 
 writes a demo book (`chapters/ch_0001.txt` ... ) suitable for
-`loom run --domain novel_digest --items <target_dir> --backend mock`.
+`dagger run --domain novel_digest --items <target_dir> --backend mock`.
 """
 
 from __future__ import annotations

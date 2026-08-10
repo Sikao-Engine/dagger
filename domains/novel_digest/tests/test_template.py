@@ -8,8 +8,8 @@ dependencies.
 
 from __future__ import annotations
 
-from loom_kernel.dag import EdgeKind, instantiate
-from loom_kernel.dag.instantiator import ShardPlan
+from dagger_kernel.dag import EdgeKind, instantiate
+from dagger_kernel.dag.instantiator import ShardPlan
 from novel_digest.templates import build_template
 
 

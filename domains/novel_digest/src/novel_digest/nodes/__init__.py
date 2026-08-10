@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from loom_kernel.dag import NodeRegistry
+from dagger_kernel.dag import NodeRegistry
 
 from .entity_merge import EntityMergeNode
 from .timeline_merge import TimelineMergeNode

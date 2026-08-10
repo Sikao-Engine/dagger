@@ -6,7 +6,7 @@ Scans `<root>/chapters/*.txt` into an ordered WorkItem list:
 - `payload` carries `word_count` (shard weight), `volume`, `title`, `path`.
 - Volume boundaries (a `vNN` prefix in the stem, e.g. `v02_ch0007.txt`) become
   Milestones at each volume's last chapter.
-- The frontier (resume pointer) is read from `<root>/.loom/cursor.json` when
+- The frontier (resume pointer) is read from `<root>/.dagger/cursor.json` when
   present — the file-system layer of the three-layer recovery model (§7.3).
 """
 
@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from loom_kernel.planning import ItemLedgerSnapshot, Milestone, WorkItem
+from dagger_kernel.planning import ItemLedgerSnapshot, Milestone, WorkItem
 
 _SEQ_RE = re.compile(r"(\d+)(?!.*\d)")
 _VOLUME_RE = re.compile(r"^v(\d+)", re.IGNORECASE)
@@ -56,8 +56,8 @@ def _word_count(path: Path) -> int:
 
 
 def read_frontier(root: Path) -> str | None:
-    """Read `.loom/cursor.json`'s cursor_item_id if the file exists."""
-    cursor = Path(root, ".loom", "cursor.json")
+    """Read `.dagger/cursor.json`'s cursor_item_id if the file exists."""
+    cursor = Path(root, ".dagger", "cursor.json")
     if not cursor.exists():
         return None
     try:

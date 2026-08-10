@@ -1,4 +1,4 @@
-# 通用批量 Agent 编排底座（工作名：**Loom**）架构设计
+# 通用批量 Agent 编排底座（工作名：**Dagger**）架构设计
 
 > 本文定义一个领域无关的「批量 / 分片 / Skill-Node DAG」前后端底座，使得任何一类
 > 「**有 N 个同构工作项，处理每一项都需要语义判断，但整体规则明确、可沉淀**」的任务
@@ -16,7 +16,7 @@
 
 ## 目录
 
-1. [Loom 要解决的问题与五个内核](#1-loom-要解决的问题与五个内核)
+1. [Dagger 要解决的问题与五个内核](#1-dagger-要解决的问题与五个内核)
 2. [领域模型](#2-领域模型)
 3. [分层与包结构](#3-分层与包结构)
 4. [内核 A：DAG 编排引擎](#4-内核-adag-编排引擎)
@@ -35,9 +35,9 @@
 
 ---
 
-## 1. Loom 要解决的问题与五个内核
+## 1. Dagger 要解决的问题与五个内核
 
-Loom 解决的是一类通用问题：
+Dagger 解决的是一类通用问题：
 
 > **有 N 个同构工作项，处理每一项都需要「语义判断」，因此不能纯脚本；
 > 但整体规则明确、可沉淀，因此不该长期由人做。**
@@ -114,9 +114,9 @@ class WorkItem:
 ## 3. 分层与包结构
 
 ```
-loom/
+dagger/
 ├── packages/
-│   ├── loom_kernel/            # 领域无关内核（无 HTTP、无 DB 依赖，可单测）
+│   ├── dagger_kernel/            # 领域无关内核（无 HTTP、无 DB 依赖，可单测）
 │   │   ├── dag/
 │   │   │   ├── template.py     # NodeDef / EdgeDef / DagTemplate / EdgeKind
 │   │   │   ├── instantiator.py # 模板 × Shard[] → NodeRun DAG
@@ -132,14 +132,14 @@ loom/
 │   │   ├── state/              # StateStore 内核（详见 state_layer_architecture.md）
 │   │   └── spi.py              # 所有 SPI Protocol 定义（单一入口）
 │   │
-│   ├── loom_agent/             # Agent 协议层
+│   ├── dagger_agent/             # Agent 协议层
 │   │   ├── client.py           # opencode 兼容 HTTP + SSE 异步客户端
 │   │   ├── process_manager.py  # 按 workdir 起独立进程 + 端口分配 + 健康探活 + 回收
 │   │   ├── session_runner.py   # prompt 下发 → SSE 消费 → transcript 落盘 → 等待合同
 │   │   ├── sse_parser.py
 │   │   └── backends/           # AgentBackend 实现：opencode / 其他 CLI-agent / mock
 │   │
-│   └── loom_cli/               # 给 Agent 用的确定性 CLI 脚手架
+│   └── dagger_cli/               # 给 Agent 用的确定性 CLI 脚手架
 │       └── scaffold.py         # JSON 输出 + 语义化退出码 + 幂等 + 状态文件读写
 │
 ├── server/                     # Litestar HTTP 服务 + 调度
@@ -164,7 +164,7 @@ loom/
     └── novel_digest/           # 网文剧情整理示例
 ```
 
-**依赖方向严格单向**：`domains → server → loom_kernel`，`loom_kernel` 不 import 任何领域符号，
+**依赖方向严格单向**：`domains → server → dagger_kernel`，`dagger_kernel` 不 import 任何领域符号，
 不 import Litestar / SQLAlchemy。这条规则由 CI 的 import-linter 守住。
 
 ---
@@ -185,7 +185,7 @@ loom/
 ### 4.2 ExecutorCatalog：启动期注册表
 
 ```python
-# loom_kernel/executors/catalog.py
+# dagger_kernel/executors/catalog.py
 @dataclass(frozen=True)
 class ExecutorSpec:
     key: str                       # 全局唯一；建议 "<domain>.<name>" 命名空间
@@ -214,7 +214,7 @@ class ExecutorCatalog:
 
 ### 4.3 动态分片展开
 
-除「调度前分片列表已定」外，Loom 支持 `Scope.SHARD_DYNAMIC`：
+除「调度前分片列表已定」外，Dagger 支持 `Scope.SHARD_DYNAMIC`：
 入口节点执行完后返回 `shards: [...]`，调度器据此**二次展开** DAG。适用于
 「分片数依赖 Agent 的第一次扫描结果」的场景（例如先让 Agent 读目录才知道有多少卷）。
 
@@ -410,7 +410,7 @@ class Sharder(Protocol):
 
 ### 7.3 断点续传指针
 
-`StateSeeder` 写入 `<workspace>/.loom/cursor.json`：
+`StateSeeder` 写入 `<workspace>/.dagger/cursor.json`：
 
 ```json
 { "run_id": "...", "shard_index": 1, "cursor_item_id": "ch_0413", "updated_at": "..." }
@@ -546,7 +546,7 @@ class DomainPlugin(Protocol):
     # ── 现场 ──
     def workspace_provider(self) -> WorkspaceProvider: ...  # 缺省: none
     def references(self) -> list[ReferenceSpec]: ...        # 多路参照系
-    def state_seeder(self) -> StateSeeder | None: ...       # 写入 .loom/cursor.json 等
+    def state_seeder(self) -> StateSeeder | None: ...       # 写入 .dagger/cursor.json 等
 
     # ── 审查 ──
     def artifact_spec(self) -> ArtifactSpec | None: ...
@@ -577,7 +577,7 @@ class SkillSpec:
 ### 确定性 CLI 脚手架
 
 Agent 在节点内常需调用确定性命令推进指针（枚举、合并、扫描、构建）。
-底座不内置任何领域命令，只提供 `loom_cli` 脚手架，约定三条契约：
+底座不内置任何领域命令，只提供 `dagger_cli` 脚手架，约定三条契约：
 **JSON 输出 + 语义化退出码 + 幂等**。领域自带 CLI，Agent 通过它完成「能用代码写死的」部分。
 
 ---
@@ -815,7 +815,7 @@ NOVEL_DIGEST_TEMPLATE = DagTemplate(
 
 **非目标**
 
-- 不做通用工作流引擎（Airflow/Temporal 替代品）。Loom 的定位是
+- 不做通用工作流引擎（Airflow/Temporal 替代品）。Dagger 的定位是
   「**面向 AI Agent 的批量分片编排**」，DAG 规模在几十到几百节点，单机 SQLite 足够
 - 不做多租户与权限体系。默认单团队内网部署
 - 不做 Agent 本身。Agent 能力由 backend（opencode 兼容服务 / 其他 CLI-agent）提供

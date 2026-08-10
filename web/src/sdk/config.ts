@@ -1,5 +1,5 @@
 /**
- * Loom API Configuration
+ * Dagger API Configuration
  *
  * 同域生产 (server 静态托管前端): VITE_SERVER_URL 为空，路径以 / 开头
  * 开发 (vite dev): VITE_SERVER_URL = "http://localhost:8000"，走 vite proxy 或直连

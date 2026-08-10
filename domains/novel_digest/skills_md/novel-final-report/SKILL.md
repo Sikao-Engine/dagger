@@ -1,6 +1,6 @@
 ---
 name: novel-final-report
-description: 汇总运行终稿。Use when: 收到 /novel-final-report 指令，一致性校验已完成，需要汇总全局实体表/时间线/矛盾清单/分卷总述为人读终稿（Loom novel_digest 领域的收尾 agent 节点）。
+description: 汇总运行终稿。Use when: 收到 /novel-final-report 指令，一致性校验已完成，需要汇总全局实体表/时间线/矛盾清单/分卷总述为人读终稿（Dagger novel_digest 领域的收尾 agent 节点）。
 ---
 
 # novel-final-report — 运行终稿

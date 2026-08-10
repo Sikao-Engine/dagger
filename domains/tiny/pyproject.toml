@@ -1,12 +1,12 @@
 [project]
-name = "loom-domain-tiny"
+name = "dagger-domain-tiny"
 version = "0.1.0"
-description = "Tiny demo domain for Loom: local file batch summarization"
+description = "Tiny demo domain for Dagger: local file batch summarization"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["loom_kernel"]
+dependencies = ["dagger_kernel"]
 
-[project.entry-points."loom.domains"]
+[project.entry-points."dagger.domains"]
 tiny = "tiny.plugin:plugin"
 
 [build-system]

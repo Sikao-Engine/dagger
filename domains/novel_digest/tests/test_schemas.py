@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 
 import novel_digest.schemas
-from loom_kernel.state.schema import SCHEMA_REGISTRY, validate
+from dagger_kernel.state.schema import SCHEMA_REGISTRY, validate
 from novel_digest.schemas import (
     NOVEL_CHAPTER,
     NOVEL_CONSISTENCY_REPORT,

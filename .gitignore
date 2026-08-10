@@ -37,15 +37,15 @@ web/.vite/
 .DS_Store
 Thumbs.db
 
-# Loom runtime
-.loom/
-*.loomarc
+# Dagger runtime
+.dagger/
+*.daggerarc
 /state/
 /workspaces/
 
-# Loom DB (default SQLite; tests/migrations produce these)
-loom.db
-loom.db-*
+# Dagger DB (default SQLite; tests/migrations produce these)
+dagger.db
+dagger.db-*
 *.sqlite
 *.sqlite-*
 

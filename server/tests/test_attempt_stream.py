@@ -37,7 +37,7 @@ def test_transcript_reads_written_jsonl(
     client, items_dir: Path, data_dir: Path
 ) -> None:
     """Write a fake transcript.jsonl → GET returns its lines."""
-    from loom_kernel.state import K, StateStore
+    from dagger_kernel.state import K, StateStore
 
     run_id = _create_run(client, items_dir)
     # Find an attempt + its node_run.

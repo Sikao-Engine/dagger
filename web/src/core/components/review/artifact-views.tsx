@@ -5,7 +5,7 @@
  * here does the work.
  *
  * Views are a closed set matching the kernel's `KNOWN_VIEWS` (see
- * `loom_kernel/state/artifact_spec.py`). Adding a new view requires:
+ * `dagger_kernel/state/artifact_spec.py`). Adding a new view requires:
  *   1. add it to KNOWN_VIEWS in the kernel
  *   2. add a renderer here
  *   3. wire it in `renderArtifactView`

@@ -57,8 +57,8 @@ def test_item_artifact_bytes_returns_raw(client, items_dir: Path) -> None:
     assert res.headers["content-type"] == "application/octet-stream"
     body = res.content
     assert b"alpha" in body
-    assert res.headers.get("X-Loom-Slot") == "summary"
-    assert res.headers.get("X-Loom-Sha256")
+    assert res.headers.get("X-Dagger-Slot") == "summary"
+    assert res.headers.get("X-Dagger-Sha256")
 
 
 def test_item_artifact_bytes_missing_slot_404(client, items_dir: Path) -> None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from loom_kernel.planning import WorkItem
+from dagger_kernel.planning import WorkItem
 
 EXCERPT_CHARS = 500
 

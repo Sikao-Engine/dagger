@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from loom_server.events import (
+from dagger_server.events import (
     EventBus,
     make_node_started,
     make_run_completed,
     make_run_started,
 )
-from loom_server.sse import SSEBroker
+from dagger_server.sse import SSEBroker
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ class TestLiveStream:
 
 class TestAttemptStream:
     async def test_replays_transcript_lines(self, broker: SSEBroker, tmp_path) -> None:
-        from loom_kernel.state import K, StateStore
+        from dagger_kernel.state import K, StateStore
 
         store = StateStore(tmp_path / "run", run_id="r1")
         store.begin_attempt("n1")
@@ -125,7 +125,7 @@ class TestAttemptStream:
         assert json.loads(msgs[0])["kind"] == "text"
 
     async def test_empty_when_no_transcript(self, broker: SSEBroker, tmp_path) -> None:
-        from loom_kernel.state import StateStore
+        from dagger_kernel.state import StateStore
 
         store = StateStore(tmp_path / "run", run_id="r1")
         msgs = [

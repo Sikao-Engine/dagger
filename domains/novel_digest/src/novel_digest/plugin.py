@@ -16,13 +16,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from loom_kernel.dag import DagTemplate, NodeContext, NodeRegistry
-from loom_kernel.executors import ExecutorSpec
-from loom_kernel.planning import Milestone, WorkItem
-from loom_kernel.planning.sharder import ShardPlan, weighted
-from loom_kernel.review import IntentDiffProvider, Scanner
-from loom_kernel.spi import ReferenceSpec, SkillSpec
-from loom_kernel.state.artifact_spec import ArtifactSpec, Slot
+from dagger_kernel.dag import DagTemplate, NodeContext, NodeRegistry
+from dagger_kernel.executors import ExecutorSpec
+from dagger_kernel.planning import Milestone, WorkItem
+from dagger_kernel.planning.sharder import ShardPlan, weighted
+from dagger_kernel.review import IntentDiffProvider, Scanner
+from dagger_kernel.spi import ReferenceSpec, SkillSpec
+from dagger_kernel.state.artifact_spec import ArtifactSpec, Slot
 
 from .executors import EXECUTORS
 from .items import ChapterSource, chapter_seq

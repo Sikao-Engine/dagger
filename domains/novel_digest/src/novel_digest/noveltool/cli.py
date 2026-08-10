@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from loom_cli.scaffold import EXIT_OK, CommandResult
+from dagger_cli.scaffold import EXIT_OK, CommandResult
 
 from . import core
 
